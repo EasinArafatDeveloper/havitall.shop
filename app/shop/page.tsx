@@ -19,6 +19,7 @@ function ShopContent() {
   const initialCat = searchParams.get('category') || 'all';
   const initialSearch = searchParams.get('search') || '';
   const initialHot = searchParams.get('isHot') === 'true';
+  const initialFeatured = searchParams.get('isFeatured') === 'true';
 
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -28,12 +29,13 @@ function ShopContent() {
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCat);
   const [searchTerm, setSearchTerm] = useState<string>(initialSearch);
   const [onlyHot, setOnlyHot] = useState<boolean>(initialHot);
+  const [onlyFeatured, setOnlyFeatured] = useState<boolean>(initialFeatured);
   const [maxPrice, setMaxPrice] = useState<number>(12000);
   const [sortBy, setSortBy] = useState<string>('newest');
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState<any | null>(null);
 
-  // Load initial data
+  // Load initial data & sync with cache
   useEffect(() => {
     async function loadData() {
       try {
@@ -46,7 +48,26 @@ function ShopContent() {
         const prodData = await prodRes.json();
         const catData = await catRes.json();
 
-        if (prodData.success) setProducts(prodData.products || []);
+        if (prodData.success) {
+          let loaded = prodData.products || [];
+          try {
+            const cachedFeatStr = localStorage.getItem('havitall_featured_ids');
+            if (cachedFeatStr) {
+              const featIds: string[] = JSON.parse(cachedFeatStr);
+              if (Array.isArray(featIds) && featIds.length > 0) {
+                const featSet = new Set(featIds.map((s) => String(s).toLowerCase().trim()));
+                loaded = loaded.map((p: any) => {
+                  const keys = [p._id, p.slug, p.businessKoroId, p.name]
+                    .filter(Boolean)
+                    .map((s) => String(s).toLowerCase().trim());
+                  const isFeat = keys.some((k) => featSet.has(k)) || Boolean(p.isFeatured);
+                  return { ...p, isFeatured: isFeat };
+                });
+              }
+            }
+          } catch (e) {}
+          setProducts(loaded);
+        }
         if (catData.success) setCategories(catData.categories || []);
       } catch (err) {
         console.error('Failed to load shop data:', err);
@@ -57,12 +78,14 @@ function ShopContent() {
     loadData();
   }, []);
 
-  // Update category when query param changes
+  // Update category and params when query changes
   useEffect(() => {
     const cat = searchParams.get('category');
     if (cat) setSelectedCategory(cat);
     const s = searchParams.get('search');
     if (s) setSearchTerm(s);
+    if (searchParams.get('isHot') === 'true') setOnlyHot(true);
+    if (searchParams.get('isFeatured') === 'true') setOnlyFeatured(true);
   }, [searchParams]);
 
   // Client-side filtering & sorting
@@ -74,9 +97,14 @@ function ShopContent() {
       list = list.filter((p) => p.category === selectedCategory);
     }
 
+    // Featured filter
+    if (onlyFeatured) {
+      list = list.filter((p) => Boolean(p.isFeatured));
+    }
+
     // Hot filter
     if (onlyHot) {
-      list = list.filter((p) => p.isHot);
+      list = list.filter((p) => Boolean(p.isHot));
     }
 
     // Price filter
@@ -106,7 +134,7 @@ function ShopContent() {
     }
 
     return list;
-  }, [products, selectedCategory, onlyHot, maxPrice, searchTerm, sortBy]);
+  }, [products, selectedCategory, onlyFeatured, onlyHot, maxPrice, searchTerm, sortBy]);
 
   const resetFilters = () => {
     setSelectedCategory('all');

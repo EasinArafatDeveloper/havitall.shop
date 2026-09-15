@@ -41,13 +41,15 @@ export function formatBusinessKoroProduct(item: BusinessKoroRawProduct, index: n
   const originalPrice = Math.round(price * 1.25);
   const discountPercentage = Math.round(((originalPrice - price) / originalPrice) * 100);
 
-  // Generate deterministic URL slug using item id
+  const rawId = String(item.id || item._id || item.productId || item.code || (index + 1));
+
+  // Generate deterministic URL slug using item name and rawId
   const slug = item.slug || (item.name
-    ? item.name
+    ? `${item.name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '') + `-${String(item.id || index + 1)}`
-    : `product-${item.id || index + 1}`);
+        .replace(/(^-|-$)+/g, '')}-${rawId}`
+    : `product-${rawId}`);
 
   // Fallback high-res image
   const defaultImages = [
@@ -78,8 +80,8 @@ export function formatBusinessKoroProduct(item: BusinessKoroRawProduct, index: n
   }
 
   return {
-    _id: String(item.id || `bk_${index + 1}`),
-    businessKoroId: String(item.id),
+    _id: rawId,
+    businessKoroId: rawId,
     name: item.name,
     slug,
     shortDescription: item.description 

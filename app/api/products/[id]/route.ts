@@ -99,23 +99,41 @@ export async function PUT(
       if (!memoryStore.hotProductIds) memoryStore.hotProductIds = [];
       if (!memoryStore.productOverrides) memoryStore.productOverrides = {};
 
+      const identifiersToAdd = [
+        id,
+        body.slug,
+        body.name,
+        body.businessKoroId,
+        body._id,
+      ]
+        .filter(Boolean)
+        .map((s: string) => String(s).toLowerCase().trim());
+
       if (body.isFeatured !== undefined) {
         if (body.isFeatured === true) {
-          if (!memoryStore.featuredProductIds.includes(id)) {
-            memoryStore.featuredProductIds.push(id);
-          }
+          identifiersToAdd.forEach((ident) => {
+            if (!memoryStore.featuredProductIds.includes(ident)) {
+              memoryStore.featuredProductIds.push(ident);
+            }
+          });
         } else {
-          memoryStore.featuredProductIds = memoryStore.featuredProductIds.filter((i) => i !== id);
+          memoryStore.featuredProductIds = memoryStore.featuredProductIds.filter(
+            (i) => !identifiersToAdd.includes(String(i).toLowerCase().trim())
+          );
         }
       }
 
       if (body.isHot !== undefined) {
         if (body.isHot === true) {
-          if (!memoryStore.hotProductIds.includes(id)) {
-            memoryStore.hotProductIds.push(id);
-          }
+          identifiersToAdd.forEach((ident) => {
+            if (!memoryStore.hotProductIds.includes(ident)) {
+              memoryStore.hotProductIds.push(ident);
+            }
+          });
         } else {
-          memoryStore.hotProductIds = memoryStore.hotProductIds.filter((i) => i !== id);
+          memoryStore.hotProductIds = memoryStore.hotProductIds.filter(
+            (i) => !identifiersToAdd.includes(String(i).toLowerCase().trim())
+          );
         }
       }
 
@@ -138,10 +156,18 @@ export async function PUT(
     if (db) {
       try {
         if (body.isFeatured !== undefined || body.isHot !== undefined) {
+          const matchConditions: any[] = [{ identifier: id }];
+          if (body.slug) matchConditions.push({ slug: body.slug });
+          if (body.name) matchConditions.push({ name: body.name });
+          if (body.businessKoroId) matchConditions.push({ businessKoroId: body.businessKoroId });
+
           await FeaturedProduct.findOneAndUpdate(
-            { identifier: id },
+            { $or: matchConditions },
             {
               identifier: id,
+              slug: body.slug || id,
+              name: body.name,
+              businessKoroId: body.businessKoroId,
               ...(body.isFeatured !== undefined ? { isFeatured: body.isFeatured } : {}),
               ...(body.isHot !== undefined ? { isHot: body.isHot } : {}),
             },

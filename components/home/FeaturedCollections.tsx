@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Sparkles, 
@@ -18,10 +18,84 @@ interface FeaturedCollectionsProps {
 }
 
 export default function FeaturedCollections({ products }: FeaturedCollectionsProps) {
+  const [productList, setProductList] = useState<any[]>(products || []);
   const [quickViewProduct, setQuickViewProduct] = useState<any | null>(null);
 
+  // Client-side dynamic sync with localStorage and fresh API
+  useEffect(() => {
+    // 1. Instant check against local cache
+    const applyLocalCache = () => {
+      try {
+        const cachedFeatStr = localStorage.getItem('havitall_featured_ids');
+        if (cachedFeatStr) {
+          const featIds: string[] = JSON.parse(cachedFeatStr);
+          if (Array.isArray(featIds) && featIds.length > 0) {
+            const featSet = new Set(featIds.map((s) => String(s).toLowerCase().trim()));
+            setProductList((prev) =>
+              prev.map((p) => {
+                const keys = [p._id, p.slug, p.businessKoroId, p.name]
+                  .filter(Boolean)
+                  .map((s) => String(s).toLowerCase().trim());
+                const isFeat = keys.some((k) => featSet.has(k)) || Boolean(p.isFeatured);
+                return { ...p, isFeatured: isFeat };
+              })
+            );
+          }
+        }
+      } catch (e) {}
+    };
+
+    applyLocalCache();
+
+    // 2. Fetch fresh products from API
+    async function fetchFeatured() {
+      try {
+        const res = await fetch('/api/products?limit=100');
+        const data = await res.json();
+        if (data.success && data.products && data.products.length > 0) {
+          let loaded: any[] = data.products;
+          try {
+            const cachedFeatStr = localStorage.getItem('havitall_featured_ids');
+            if (cachedFeatStr) {
+              const featIds: string[] = JSON.parse(cachedFeatStr);
+              if (Array.isArray(featIds) && featIds.length > 0) {
+                const featSet = new Set(featIds.map((s) => String(s).toLowerCase().trim()));
+                loaded = loaded.map((p: any) => {
+                  const keys = [p._id, p.slug, p.businessKoroId, p.name]
+                    .filter(Boolean)
+                    .map((s) => String(s).toLowerCase().trim());
+                  const isFeat = keys.some((k) => featSet.has(k)) || Boolean(p.isFeatured);
+                  return { ...p, isFeatured: isFeat };
+                });
+              }
+            }
+          } catch (e) {}
+          setProductList(loaded);
+        }
+      } catch (err) {
+        console.warn('Could not fetch latest products for Featured Collections:', err);
+      }
+    }
+
+    fetchFeatured();
+
+    // 3. Listen for cross-tab or in-page admin toggle events
+    const handleStorageChange = () => {
+      applyLocalCache();
+      fetchFeatured();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('havitall:featured-updated', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('havitall:featured-updated', handleStorageChange);
+    };
+  }, []);
+
   // Filter ONLY products marked as featured
-  const displayProducts = (products || []).filter((p) => Boolean(p.isFeatured));
+  const displayProducts = (productList || []).filter((p) => Boolean(p.isFeatured));
 
   return (
     <section className="py-12 sm:py-16 bg-white border-y border-slate-200">

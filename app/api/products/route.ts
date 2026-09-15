@@ -17,9 +17,9 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '100');
 
     const productMap = new Map<string, any>();
-    const deletedSet = new Set<string>(memoryStore?.deletedProductIds || []);
-    const featuredSet = new Set<string>(memoryStore?.featuredProductIds || []);
-    const hotSet = new Set<string>(memoryStore?.hotProductIds || []);
+    const deletedSet = new Set<string>((memoryStore?.deletedProductIds || []).map((s) => String(s).toLowerCase().trim()));
+    const featuredSet = new Set<string>((memoryStore?.featuredProductIds || []).map((s) => String(s).toLowerCase().trim()));
+    const hotSet = new Set<string>((memoryStore?.hotProductIds || []).map((s) => String(s).toLowerCase().trim()));
 
     // 1. Fetch deleted and featured records from MongoDB
     try {
@@ -32,21 +32,22 @@ export async function GET(request: Request) {
 
         if (deletedRecords && deletedRecords.length > 0) {
           deletedRecords.forEach((d: any) => {
-            if (d.identifier) deletedSet.add(d.identifier);
+            if (d.identifier) deletedSet.add(String(d.identifier).toLowerCase().trim());
           });
         }
 
         if (featuredRecords && featuredRecords.length > 0) {
           featuredRecords.forEach((f: any) => {
-            if (f.isFeatured && f.identifier) {
-              featuredSet.add(f.identifier);
-            } else if (f.isFeatured === false && f.identifier) {
-              featuredSet.delete(f.identifier);
+            const keys = [f.identifier, f.slug, f.name, f.businessKoroId].filter(Boolean).map((s) => String(s).toLowerCase().trim());
+            if (f.isFeatured) {
+              keys.forEach((k) => featuredSet.add(k));
+            } else if (f.isFeatured === false) {
+              keys.forEach((k) => featuredSet.delete(k));
             }
-            if (f.isHot && f.identifier) {
-              hotSet.add(f.identifier);
-            } else if (f.isHot === false && f.identifier) {
-              hotSet.delete(f.identifier);
+            if (f.isHot) {
+              keys.forEach((k) => hotSet.add(k));
+            } else if (f.isHot === false) {
+              keys.forEach((k) => hotSet.delete(k));
             }
           });
         }
@@ -55,31 +56,32 @@ export async function GET(request: Request) {
       console.warn('DB query warning in products route:', e);
     }
 
+    const checkIsDeleted = (p: any) => {
+      const keys = [p._id, p.slug, p.businessKoroId, p.name].filter(Boolean).map((s) => String(s).toLowerCase().trim());
+      return keys.some((k) => deletedSet.has(k));
+    };
+
+    const checkIsFeatured = (p: any) => {
+      const keys = [p._id, p.slug, p.businessKoroId, p.name].filter(Boolean).map((s) => String(s).toLowerCase().trim());
+      return keys.some((k) => featuredSet.has(k)) || Boolean(p.isFeatured);
+    };
+
+    const checkIsHot = (p: any) => {
+      const keys = [p._id, p.slug, p.businessKoroId, p.name].filter(Boolean).map((s) => String(s).toLowerCase().trim());
+      return keys.some((k) => hotSet.has(k)) || Boolean(p.isHot);
+    };
+
     // 2. Fetch live products from Business Koro API
     const bkProducts = await fetchBusinessKoroProducts();
     if (bkProducts && bkProducts.length > 0) {
       for (const p of bkProducts) {
         const key = p.slug || p._id || p.businessKoroId;
-        // Skip if deleted
-        if (
-          deletedSet.has(String(p._id)) ||
-          deletedSet.has(String(p.slug)) ||
-          deletedSet.has(String(p.businessKoroId))
-        ) {
+        if (checkIsDeleted(p)) {
           continue;
         }
 
-        const isFeat =
-          featuredSet.has(String(p._id)) ||
-          featuredSet.has(String(p.slug)) ||
-          featuredSet.has(String(p.businessKoroId)) ||
-          Boolean(p.isFeatured);
-
-        const isH =
-          hotSet.has(String(p._id)) ||
-          hotSet.has(String(p.slug)) ||
-          hotSet.has(String(p.businessKoroId)) ||
-          Boolean(p.isHot);
+        const isFeat = checkIsFeatured(p);
+        const isH = checkIsHot(p);
 
         productMap.set(key, { ...p, isFeatured: isFeat, isHot: isH });
       }
@@ -93,26 +95,12 @@ export async function GET(request: Request) {
         if (localProducts && localProducts.length > 0) {
           for (const p of localProducts) {
             const key = p.slug || p._id || p.businessKoroId;
-            // Skip if deleted
-            if (
-              deletedSet.has(String(p._id)) ||
-              deletedSet.has(String(p.slug)) ||
-              deletedSet.has(String(p.businessKoroId))
-            ) {
+            if (checkIsDeleted(p)) {
               continue;
             }
 
-            const isFeat =
-              featuredSet.has(String(p._id)) ||
-              featuredSet.has(String(p.slug)) ||
-              featuredSet.has(String(p.businessKoroId)) ||
-              Boolean(p.isFeatured);
-
-            const isH =
-              hotSet.has(String(p._id)) ||
-              hotSet.has(String(p.slug)) ||
-              hotSet.has(String(p.businessKoroId)) ||
-              Boolean(p.isHot);
+            const isFeat = checkIsFeatured(p);
+            const isH = checkIsHot(p);
 
             const merged = { ...p, isFeatured: isFeat, isHot: isH };
 
@@ -132,22 +120,9 @@ export async function GET(request: Request) {
     if (memoryStore?.products && memoryStore.products.length > 0) {
       for (const p of memoryStore.products) {
         const key = p.slug || p._id || p.businessKoroId;
-        if (
-          !deletedSet.has(String(p._id)) &&
-          !deletedSet.has(String(p.slug)) &&
-          !deletedSet.has(String(p.businessKoroId))
-        ) {
-          const isFeat =
-            featuredSet.has(String(p._id)) ||
-            featuredSet.has(String(p.slug)) ||
-            featuredSet.has(String(p.businessKoroId)) ||
-            Boolean(p.isFeatured);
-
-          const isH =
-            hotSet.has(String(p._id)) ||
-            hotSet.has(String(p.slug)) ||
-            hotSet.has(String(p.businessKoroId)) ||
-            Boolean(p.isHot);
+        if (!checkIsDeleted(p)) {
+          const isFeat = checkIsFeatured(p);
+          const isH = checkIsHot(p);
 
           if (!productMap.has(key)) {
             productMap.set(key, { ...p, isFeatured: isFeat, isHot: isH });

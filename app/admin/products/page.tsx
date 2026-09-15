@@ -91,16 +91,22 @@ export default function AdminProductsPage() {
 
     // Optimistic UI update
     const updatedProducts = products.map((p) =>
-      (p._id === product._id || p.slug === product.slug || p.businessKoroId === product.businessKoroId)
+      (p._id === product._id || p.slug === product.slug || p.businessKoroId === product.businessKoroId || p.name === product.name)
         ? { ...p, isFeatured: newStatus }
         : p
     );
     setProducts(updatedProducts);
 
-    // Save to localStorage
+    // Save to localStorage with multi-identifiers
     try {
-      const activeFeatured = updatedProducts.filter((p) => Boolean(p.isFeatured)).map((p) => p.slug || p._id || p.businessKoroId);
+      const activeFeatured = updatedProducts
+        .filter((p) => Boolean(p.isFeatured))
+        .flatMap((p) => [p.slug, p._id, p.businessKoroId, p.name])
+        .filter(Boolean);
       localStorage.setItem('havitall_featured_ids', JSON.stringify(activeFeatured));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('havitall:featured-updated'));
+      }
     } catch (e) {}
 
     try {
@@ -111,6 +117,8 @@ export default function AdminProductsPage() {
           isFeatured: newStatus,
           name: product.name,
           slug: product.slug,
+          businessKoroId: product.businessKoroId,
+          _id: product._id,
           price: product.price,
           originalPrice: product.originalPrice,
           category: product.category,
