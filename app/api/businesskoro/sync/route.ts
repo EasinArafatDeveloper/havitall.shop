@@ -7,7 +7,7 @@ import { memoryStore } from '@/lib/memoryStore';
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const apiKey = body.apiKey || process.env.BUSINESS_KORO_API_KEY || 'bkr_5c498792bc7ad09dbc6c1426c341ef8c0a581bd577065feb0';
+    const apiKey = body.apiKey || process.env.BUSINESS_KORO_API_KEY || 'bkr_5c498792bc7a89dbc6c1426c141ef8c8a581bd577865feb0';
     const origin = body.origin || process.env.BUSINESS_KORO_ORIGIN || 'https://havitall.shop';
     const baseUrl = process.env.BUSINESS_KORO_BASE_URL || 'https://api.businesskoro.com/api/v1/storefront';
 
