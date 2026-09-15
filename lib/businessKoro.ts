@@ -4,7 +4,7 @@
  * Headers: x-api-key, Origin
  */
 
-const API_KEY = process.env.BUSINESS_KORO_API_KEY || 'bkr_5c498792bc7ad09dbc6c1426c341ef8c0a581bd577065feb0';
+const API_KEY = process.env.BUSINESS_KORO_API_KEY || 'bkr_5c498792bc7a89dbc6c1426c141ef8c8a581bd577865feb0';
 const BASE_URL = process.env.BUSINESS_KORO_BASE_URL || 'https://api.businesskoro.com/api/v1/storefront';
 const ORIGIN_HEADER = process.env.BUSINESS_KORO_ORIGIN || 'https://havitall.shop';
 

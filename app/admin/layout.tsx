@@ -46,6 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Hero Banners', href: '/admin/banners', icon: ImageIcon },
     { name: 'Categories', href: '/admin/categories', icon: Layers },
     { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
+    { name: 'Supplier & Sync', href: '/admin/supplier', icon: RefreshCw },
   ];
 
   const handleResetData = async () => {
