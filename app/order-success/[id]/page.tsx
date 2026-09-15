@@ -13,7 +13,8 @@ import {
   Phone, 
   Printer, 
   Sparkles,
-  ShoppingBag
+  ShoppingBag,
+  Flame
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -140,6 +141,12 @@ export default function OrderSuccessPage() {
                       className="w-12 h-12 object-contain rounded-xl bg-slate-50 border border-slate-200 p-1"
                     />
                     <div>
+                      {item.isOffer && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 mb-1 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-extrabold tracking-wide">
+                          <Flame className="w-2.5 h-2.5 text-amber-600" />
+                          <span>{item.offerBadge || '🔥 Flash Deal'}</span>
+                        </span>
+                      )}
                       <p className="text-xs font-semibold text-slate-900">{item.name}</p>
                       <p className="text-[11px] text-slate-500">
                         Qty: {item.quantity} {item.selectedColor ? `• ${item.selectedColor}` : ''}

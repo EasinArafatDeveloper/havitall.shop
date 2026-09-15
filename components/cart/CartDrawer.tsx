@@ -12,7 +12,8 @@ import {
   Sparkles, 
   Tag, 
   Check, 
-  Truck 
+  Truck,
+  Flame
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -139,13 +140,21 @@ export default function CartDrawer() {
                     <div className="flex-1 min-w-0 flex flex-col justify-between">
                       <div>
                         <div className="flex items-start justify-between gap-2">
-                          <Link
-                            href={`/product/${item.slug || item.productId}`}
-                            onClick={() => setIsCartOpen(false)}
-                            className="text-sm font-semibold text-slate-900 hover:text-slate-700 transition-colors line-clamp-1"
-                          >
-                            {item.name}
-                          </Link>
+                          <div>
+                            {item.isOffer && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 mb-1 rounded-md bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold tracking-wide">
+                                <Flame className="w-3 h-3 text-amber-600" />
+                                <span>{item.offerBadge || '🔥 Flash Deal'}</span>
+                              </span>
+                            )}
+                            <Link
+                              href={`/product/${item.slug || item.productId}`}
+                              onClick={() => setIsCartOpen(false)}
+                              className="text-sm font-semibold text-slate-900 hover:text-slate-700 transition-colors line-clamp-1 block"
+                            >
+                              {item.name}
+                            </Link>
+                          </div>
                           <button
                             onClick={() => removeFromCart(item.id)}
                             className="text-slate-400 hover:text-rose-600 p-1 transition-colors"

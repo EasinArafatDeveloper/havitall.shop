@@ -9,6 +9,7 @@ import connectToDatabase from '@/lib/mongodb';
 import Product from '@/lib/models/Product';
 import Category from '@/lib/models/Category';
 import Banner from '@/lib/models/Banner';
+import Offer from '@/lib/models/Offer';
 import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,7 @@ async function getData() {
   const productMap = new Map<string, any>();
   let categories: any[] = [];
   let banners: any[] = [];
+  let offers: any[] = [];
 
   // 1. Fetch live products from Business Koro
   const bkProducts = await fetchBusinessKoroProducts();
@@ -27,13 +29,14 @@ async function getData() {
     }
   }
 
-  // 2. Fetch local products and banners from MongoDB
+  // 2. Fetch local products, banners, categories, and offers from MongoDB
   try {
     const db = await connectToDatabase();
     if (db) {
       const localProducts = await Product.find().sort({ createdAt: -1 }).lean();
       const localCategories = await Category.find().lean();
       const localBanners = await Banner.find({ isActive: true }).sort({ order: 1 }).lean();
+      const localOffers = await Offer.find({ isActive: true }).sort({ order: 1, updatedAt: -1 }).limit(2).lean();
 
       if (localProducts && localProducts.length > 0) {
         for (const p of JSON.parse(JSON.stringify(localProducts))) {
@@ -50,6 +53,9 @@ async function getData() {
       }
       if (localBanners && localBanners.length > 0) {
         banners = JSON.parse(JSON.stringify(localBanners));
+      }
+      if (localOffers && localOffers.length > 0) {
+        offers = JSON.parse(JSON.stringify(localOffers));
       }
     }
   } catch (e) {
@@ -68,6 +74,9 @@ async function getData() {
   if (banners.length === 0) {
     banners = memoryStore?.banners || initialBanners;
   }
+  if (offers.length === 0) {
+    offers = memoryStore?.offers?.filter((o: any) => o.isActive).slice(0, 2) || [];
+  }
 
   const products = Array.from(productMap.values());
 
@@ -75,11 +84,12 @@ async function getData() {
     products,
     categories,
     banners,
+    offers,
   };
 }
 
 export default async function HomePage() {
-  const { products, categories, banners } = await getData();
+  const { products, categories, banners, offers } = await getData();
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -92,9 +102,8 @@ export default async function HomePage() {
       {/* Hot & Trending Products */}
       <HotProductsSection products={products} />
 
-      {/* Limited Countdown Deal of the Day */}
-      <DealOfTheDay />
+      {/* Limited Countdown Deal of the Day (Max 2 Active Offers) */}
+      <DealOfTheDay initialOffers={offers} />
     </div>
   );
 }
-

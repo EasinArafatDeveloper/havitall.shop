@@ -14,7 +14,8 @@ import {
   Check, 
   ShoppingBag, 
   Tag,
-  AlertCircle
+  AlertCircle,
+  Flame
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
@@ -394,6 +395,12 @@ export default function CheckoutPage() {
                       className="w-14 h-14 object-contain rounded-xl bg-slate-50 border border-slate-200 p-1 shrink-0"
                     />
                     <div className="flex-1 min-w-0">
+                      {item.isOffer && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 mb-1 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-extrabold tracking-wide">
+                          <Flame className="w-2.5 h-2.5 text-amber-600" />
+                          <span>{item.offerBadge || '🔥 Flash Deal'}</span>
+                        </span>
+                      )}
                       <p className="text-xs font-semibold text-slate-900 truncate">{item.name}</p>
                       <p className="text-[11px] text-slate-500">
                         Qty: {item.quantity} {item.selectedColor ? `• ${item.selectedColor}` : ''}

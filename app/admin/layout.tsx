@@ -14,7 +14,8 @@ import {
   Menu, 
   X, 
   RefreshCw,
-  LogOut
+  LogOut,
+  Flame
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 
@@ -43,6 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Products', href: '/admin/products', icon: Package },
+    { name: 'Flash Offers', href: '/admin/offers', icon: Flame },
     { name: 'Hero Banners', href: '/admin/banners', icon: ImageIcon },
     { name: 'Categories', href: '/admin/categories', icon: Layers },
     { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },

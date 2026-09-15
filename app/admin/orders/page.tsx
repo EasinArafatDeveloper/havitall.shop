@@ -13,7 +13,8 @@ import {
   MapPin, 
   Phone, 
   ExternalLink,
-  Printer
+  Printer,
+  Flame
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 
@@ -159,69 +160,80 @@ export default function AdminOrdersPage() {
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((order) => (
-                  <tr key={order._id || order.orderNumber} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3.5 font-mono font-bold text-slate-950">
-                      {order.orderNumber}
-                    </td>
-                    <td className="py-3.5">
-                      <p className="font-bold text-slate-950">{order.customer?.fullName}</p>
-                      <p className="text-[11px] text-slate-500">{order.customer?.phone} • {order.customer?.city}</p>
-                    </td>
-                    <td className="py-3.5 text-slate-600">
-                      {order.items?.length || 1} item(s)
-                    </td>
-                    <td className="py-3.5 font-bold text-slate-950 font-display">
-                      ৳{order.totalAmount?.toLocaleString()}
-                    </td>
-                    <td className="py-3.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-700">
-                        {order.paymentMethod}
-                      </span>
-                    </td>
-                    <td className="py-3.5">
-                      <select
-                        value={order.orderStatus}
-                        onChange={(e) => handleUpdateStatus(order.orderNumber || order._id, e.target.value)}
-                        className={`text-[11px] font-extrabold uppercase rounded-lg px-2.5 py-1 border focus:outline-none cursor-pointer ${
-                          order.orderStatus === 'Delivered'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : order.orderStatus === 'Shipped'
-                            ? 'bg-sky-50 text-sky-700 border-sky-200'
-                            : order.orderStatus === 'Processing'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : order.orderStatus === 'Cancelled'
-                            ? 'bg-rose-50 text-rose-700 border-rose-200'
-                            : 'bg-slate-100 text-slate-800 border-slate-200'
-                        }`}
-                      >
-                        <option value="Placed">Placed</option>
-                        <option value="Confirmed">Confirmed</option>
-                        <option value="Processing">Processing</option>
-                        <option value="Shipped">Shipped</option>
-                        <option value="Delivered">Delivered</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
-                    </td>
-                    <td className="py-3.5 text-right space-x-2">
-                      <button
-                        onClick={() => setSelectedOrder(order)}
-                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                        title="View Full Details"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
-                      <Link
-                        href={`/track-order?id=${order.orderNumber}`}
-                        target="_blank"
-                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-900 inline-block"
-                        title="Track Page"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </Link>
-                    </td>
-                  </tr>
-                ))
+                filteredOrders.map((order) => {
+                  const hasOfferItem = order.items?.some((it: any) => it.isOffer);
+                  return (
+                    <tr key={order._id || order.orderNumber} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3.5 font-mono font-bold text-slate-950">
+                        <div className="flex items-center gap-1.5">
+                          <span>{order.orderNumber}</span>
+                          {hasOfferItem && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black" title="Contains Flash Offer Product">
+                              <Flame className="w-2.5 h-2.5 text-amber-600" />
+                              <span>OFFER</span>
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3.5">
+                        <p className="font-bold text-slate-950">{order.customer?.fullName}</p>
+                        <p className="text-[11px] text-slate-500">{order.customer?.phone} • {order.customer?.city}</p>
+                      </td>
+                      <td className="py-3.5 text-slate-600">
+                        {order.items?.length || 1} item(s)
+                      </td>
+                      <td className="py-3.5 font-bold text-slate-950 font-display">
+                        ৳{order.totalAmount?.toLocaleString()}
+                      </td>
+                      <td className="py-3.5">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-700">
+                          {order.paymentMethod}
+                        </span>
+                      </td>
+                      <td className="py-3.5">
+                        <select
+                          value={order.orderStatus}
+                          onChange={(e) => handleUpdateStatus(order.orderNumber || order._id, e.target.value)}
+                          className={`text-[11px] font-extrabold uppercase rounded-lg px-2.5 py-1 border focus:outline-none cursor-pointer ${
+                            order.orderStatus === 'Delivered'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : order.orderStatus === 'Shipped'
+                              ? 'bg-sky-50 text-sky-700 border-sky-200'
+                              : order.orderStatus === 'Processing'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : order.orderStatus === 'Cancelled'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-slate-100 text-slate-800 border-slate-200'
+                          }`}
+                        >
+                          <option value="Placed">Placed</option>
+                          <option value="Confirmed">Confirmed</option>
+                          <option value="Processing">Processing</option>
+                          <option value="Shipped">Shipped</option>
+                          <option value="Delivered">Delivered</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                      </td>
+                      <td className="py-3.5 text-right space-x-2">
+                        <button
+                          onClick={() => setSelectedOrder(order)}
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                          title="View Full Details"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <Link
+                          href={`/track-order?id=${order.orderNumber}`}
+                          target="_blank"
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-900 inline-block"
+                          title="Track Page"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -278,6 +290,12 @@ export default function AdminOrdersPage() {
                     <div className="flex items-center gap-3">
                       <img src={item.image} alt="" className="w-10 h-10 object-contain rounded-lg bg-white border border-slate-200 p-0.5" />
                       <div>
+                        {item.isOffer && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 mb-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black">
+                            <Flame className="w-2.5 h-2.5 text-amber-600" />
+                            <span>{item.offerBadge || '🔥 Flash Deal'}</span>
+                          </span>
+                        )}
                         <p className="font-bold text-slate-950">{item.name}</p>
                         <p className="text-[11px] text-slate-500">Qty: {item.quantity} {item.selectedColor ? `• ${item.selectedColor}` : ''}</p>
                       </div>

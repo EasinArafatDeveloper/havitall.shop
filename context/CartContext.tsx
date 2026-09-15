@@ -15,6 +15,8 @@ export interface CartItem {
   selectedColor?: string;
   selectedSize?: string;
   stock?: number;
+  isOffer?: boolean;
+  offerBadge?: string;
 }
 
 interface CartContextType {
@@ -22,7 +24,14 @@ interface CartContextType {
   wishlist: string[]; // product IDs or slugs
   isCartOpen: boolean;
   setIsCartOpen: (open: boolean) => void;
-  addToCart: (product: any, quantity?: number, selectedColor?: string, selectedSize?: string) => void;
+  addToCart: (
+    product: any,
+    quantity?: number,
+    selectedColor?: string,
+    selectedSize?: string,
+    isOffer?: boolean,
+    offerBadge?: string
+  ) => void;
   removeFromCart: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
@@ -90,9 +99,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     product: any,
     quantity = 1,
     selectedColor?: string,
-    selectedSize?: string
+    selectedSize?: string,
+    isOffer?: boolean,
+    offerBadge?: string
   ) => {
-    const itemKey = `${product._id || product.id || product.slug}-${selectedColor || 'default'}-${selectedSize || 'default'}`;
+    const isOfferProduct = Boolean(isOffer || product.isOffer);
+    const offerBadgeText = offerBadge || product.offerBadge || (isOfferProduct ? '🔥 Flash Deal' : undefined);
+    const itemKey = `${product._id || product.id || product.slug}-${selectedColor || 'default'}-${selectedSize || 'default'}${isOfferProduct ? '-offer' : ''}`;
 
     setCart((prev) => {
       const existingIdx = prev.findIndex((item) => item.id === itemKey);
@@ -107,19 +120,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
         productId: product._id || product.id || product.slug,
         name: product.name,
         slug: product.slug,
-        price: Number(product.price),
+        price: Number(product.offerPrice || product.price),
         originalPrice: product.originalPrice ? Number(product.originalPrice) : undefined,
         image: product.images?.[0] || product.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000',
         quantity,
         selectedColor: selectedColor || product.variants?.colors?.[0],
         selectedSize: selectedSize || product.variants?.sizes?.[0],
         stock: product.stock,
+        isOffer: isOfferProduct,
+        offerBadge: offerBadgeText,
       };
 
       return [...prev, newItem];
     });
 
-    success(`Added "${product.name}" to cart!`);
+    if (isOfferProduct) {
+      success(`🔥 Flash Deal "${product.name}" added to cart with special discount!`);
+    } else {
+      success(`Added "${product.name}" to cart!`);
+    }
     setIsCartOpen(true);
   };
 
@@ -169,20 +188,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Coupon calculation
   const applyCoupon = (code: string): boolean => {
     const cleanCode = code.trim().toUpperCase();
-    if (cleanCode === 'HAVITALL20') {
-      setAppliedCoupon(cleanCode);
-      success('Coupon applied! 20% discount added.');
-      return true;
-    } else if (cleanCode === 'HAVITALL200') {
+    if (!cleanCode) return false;
+
+    // Check custom offer codes (e.g., HAVITALL30, FLASH25, WELCOME10, HAVITALL200)
+    const percentMatch = cleanCode.match(/(\d+)%?$/);
+    const hasPercent = percentMatch && parseInt(percentMatch[1]) > 0 && parseInt(percentMatch[1]) <= 90;
+
+    if (cleanCode === 'HAVITALL200') {
       setAppliedCoupon(cleanCode);
       success('Coupon applied! ৳200 flat discount added.');
       return true;
-    } else if (cleanCode === 'WELCOME10') {
+    } else if (hasPercent) {
+      const pct = parseInt(percentMatch[1]);
       setAppliedCoupon(cleanCode);
-      success('Coupon applied! 10% welcome discount added.');
+      success(`Coupon "${cleanCode}" applied! ${pct}% discount added.`);
+      return true;
+    } else if (cleanCode === 'HAVITALL20' || cleanCode === 'WELCOME10' || cleanCode.startsWith('FLASH') || cleanCode.startsWith('HAVITALL')) {
+      setAppliedCoupon(cleanCode);
+      success(`Coupon "${cleanCode}" applied! Special discount added.`);
       return true;
     } else {
-      error('Invalid promo code. Try HAVITALL20 or HAVITALL200');
+      error('Invalid promo code. Try HAVITALL30 or HAVITALL20');
       return false;
     }
   };
@@ -193,12 +219,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   let discount = 0;
-  if (appliedCoupon === 'HAVITALL20') {
-    discount = Math.round(subtotal * 0.2);
-  } else if (appliedCoupon === 'HAVITALL200') {
-    discount = Math.min(subtotal, 200);
-  } else if (appliedCoupon === 'WELCOME10') {
-    discount = Math.round(subtotal * 0.1);
+  if (appliedCoupon) {
+    if (appliedCoupon === 'HAVITALL200') {
+      discount = Math.min(subtotal, 200);
+    } else {
+      const match = appliedCoupon.match(/(\d+)%?$/);
+      if (match) {
+        const pct = Math.min(90, parseInt(match[1]));
+        discount = Math.round(subtotal * (pct / 100));
+      } else {
+        discount = Math.round(subtotal * 0.2);
+      }
+    }
   }
 
   const total = Math.max(0, subtotal + shippingFee - discount);

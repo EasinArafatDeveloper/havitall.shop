@@ -8,6 +8,8 @@ export interface IOrderItem {
   image: string;
   selectedColor?: string;
   selectedSize?: string;
+  isOffer?: boolean;
+  offerBadge?: string;
 }
 
 export interface IOrder extends Document {
@@ -47,6 +49,8 @@ const OrderItemSchema = new Schema<IOrderItem>(
     image: { type: String, required: true },
     selectedColor: { type: String },
     selectedSize: { type: String },
+    isOffer: { type: Boolean, default: false },
+    offerBadge: { type: String },
   },
   { _id: false }
 );
