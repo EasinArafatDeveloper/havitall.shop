@@ -1,0 +1,129 @@
+import { NextResponse } from 'next/server';
+import connectToDatabase from '@/lib/mongodb';
+import Product from '@/lib/models/Product';
+import { memoryStore } from '@/lib/memoryStore';
+
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const db = await connectToDatabase();
+
+    if (db) {
+      let product = null;
+      if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        product = await Product.findById(id).lean();
+      }
+      if (!product) {
+        product = await Product.findOne({ slug: id }).lean();
+      }
+      if (product) {
+        return NextResponse.json({ success: true, product, source: 'mongodb' });
+      }
+    }
+
+    // Memory store fallback
+    const memProduct = memoryStore?.products.find(
+      (p) => p._id === id || p.slug === id
+    );
+
+    if (!memProduct) {
+      return NextResponse.json(
+        { success: false, error: 'Product not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, product: memProduct, source: 'memory' });
+  } catch (error: any) {
+    console.error('Error fetching single product:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const body = await request.json();
+    const db = await connectToDatabase();
+
+    if (body.originalPrice && body.price && Number(body.originalPrice) > Number(body.price)) {
+      body.discountPercentage = Math.round(
+        ((Number(body.originalPrice) - Number(body.price)) / Number(body.originalPrice)) * 100
+      );
+    }
+
+    if (db) {
+      let updated = null;
+      if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        updated = await Product.findByIdAndUpdate(id, body, { new: true }).lean();
+      } else {
+        updated = await Product.findOneAndUpdate({ slug: id }, body, { new: true }).lean();
+      }
+      if (updated) {
+        // Also update memory store
+        const memIdx = memoryStore?.products.findIndex((p) => p._id === id || p.slug === id);
+        if (memIdx !== undefined && memIdx >= 0) {
+          memoryStore!.products[memIdx] = { ...memoryStore!.products[memIdx], ...updated };
+        }
+        return NextResponse.json({ success: true, product: updated, source: 'mongodb' });
+      }
+    }
+
+    // Memory update
+    const memIdx = memoryStore?.products.findIndex((p) => p._id === id || p.slug === id);
+    if (memIdx === undefined || memIdx === -1) {
+      return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
+    }
+
+    memoryStore!.products[memIdx] = {
+      ...memoryStore!.products[memIdx],
+      ...body,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return NextResponse.json({
+      success: true,
+      product: memoryStore!.products[memIdx],
+      source: 'memory',
+    });
+  } catch (error: any) {
+    console.error('Error updating product:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const db = await connectToDatabase();
+
+    if (db) {
+      if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        await Product.findByIdAndDelete(id);
+      } else {
+        await Product.findOneAndDelete({ slug: id });
+      }
+    }
+
+    // Also remove from memory
+    if (memoryStore) {
+      memoryStore.products = memoryStore.products.filter(
+        (p) => p._id !== id && p.slug !== id
+      );
+    }
+
+    return NextResponse.json({ success: true, message: 'Product deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting product:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
