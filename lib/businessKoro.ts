@@ -41,13 +41,13 @@ export function formatBusinessKoroProduct(item: BusinessKoroRawProduct, index: n
   const originalPrice = Math.round(price * 1.25);
   const discountPercentage = Math.round(((originalPrice - price) / originalPrice) * 100);
 
-  // Generate URL slug
-  const slug = item.name
+  // Generate deterministic URL slug using item id
+  const slug = item.slug || (item.name
     ? item.name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '') + `-${item.id?.substring(0, 6) || index + 1}`
-    : `product-${item.id || index + 1}`;
+        .replace(/(^-|-$)+/g, '') + `-${String(item.id || index + 1)}`
+    : `product-${item.id || index + 1}`);
 
   // Fallback high-res image
   const defaultImages = [

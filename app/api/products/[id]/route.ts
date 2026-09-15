@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Product from '@/lib/models/Product';
+import DeletedProduct from '@/lib/models/DeletedProduct';
 import { memoryStore } from '@/lib/memoryStore';
 import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
 
@@ -11,24 +12,39 @@ export async function GET(
   try {
     const { id } = params;
 
+    // 0. Check if deleted
+    if (memoryStore?.deletedProductIds?.includes(id)) {
+      return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
+    }
+
+    const db = await connectToDatabase();
+    if (db) {
+      const isDeletedRecord = await DeletedProduct.findOne({ identifier: id }).lean();
+      if (isDeletedRecord) {
+        return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
+      }
+    }
+
     // 1. Try Business Koro live products
     const bkProducts = await fetchBusinessKoroProducts();
     if (bkProducts && bkProducts.length > 0) {
-      const found = bkProducts.find((p: any) => p._id === id || p.slug === id || p.businessKoroId === id);
+      const found = bkProducts.find((p: any) => p._id === id || p.slug === id || p.businessKoroId === id || p.id === id);
       if (found) {
         return NextResponse.json({ success: true, product: found, source: 'businesskoro' });
       }
     }
 
     // 2. Try MongoDB
-    const db = await connectToDatabase();
     if (db) {
       let product = null;
       if (id.match(/^[0-9a-fA-F]{24}$/)) {
-        product = await Product.findById(id).lean();
+        product = await Product.findOne({ _id: id, isDeleted: { $ne: true } }).lean();
       }
       if (!product) {
-        product = await Product.findOne({ slug: id }).lean();
+        product = await Product.findOne({ slug: id, isDeleted: { $ne: true } }).lean();
+      }
+      if (!product) {
+        product = await Product.findOne({ businessKoroId: id, isDeleted: { $ne: true } }).lean();
       }
       if (product) {
         return NextResponse.json({ success: true, product, source: 'mongodb' });
@@ -37,7 +53,7 @@ export async function GET(
 
     // 3. Memory store fallback
     const memProduct = memoryStore?.products.find(
-      (p) => p._id === id || p.slug === id
+      (p) => (p._id === id || p.slug === id || p.businessKoroId === id) && !memoryStore.deletedProductIds?.includes(id)
     );
 
     if (!memProduct) {
@@ -118,22 +134,39 @@ export async function DELETE(
     const { id } = params;
     const db = await connectToDatabase();
 
+    // 1. Permanently record deletion identifier in MongoDB
     if (db) {
-      if (id.match(/^[0-9a-fA-F]{24}$/)) {
-        await Product.findByIdAndDelete(id);
-      } else {
-        await Product.findOneAndDelete({ slug: id });
+      try {
+        await DeletedProduct.findOneAndUpdate(
+          { identifier: id },
+          { identifier: id, deletedAt: new Date() },
+          { upsert: true }
+        );
+
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+          await Product.findByIdAndDelete(id);
+        } else {
+          await Product.findOneAndDelete({ $or: [{ slug: id }, { businessKoroId: id }, { _id: id }] });
+        }
+      } catch (dbErr) {
+        console.warn('MongoDB product deletion error:', dbErr);
       }
     }
 
-    // Also remove from memory
+    // 2. Add to memory store deleted tracking & clean memory list
     if (memoryStore) {
+      if (!memoryStore.deletedProductIds) {
+        memoryStore.deletedProductIds = [];
+      }
+      if (!memoryStore.deletedProductIds.includes(id)) {
+        memoryStore.deletedProductIds.push(id);
+      }
       memoryStore.products = memoryStore.products.filter(
-        (p) => p._id !== id && p.slug !== id
+        (p) => p._id !== id && p.slug !== id && p.businessKoroId !== id
       );
     }
 
-    return NextResponse.json({ success: true, message: 'Product deleted successfully' });
+    return NextResponse.json({ success: true, message: 'Product deleted permanently' });
   } catch (error: any) {
     console.error('Error deleting product:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

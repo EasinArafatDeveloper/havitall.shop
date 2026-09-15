@@ -4,74 +4,86 @@ import Product from '@/lib/models/Product';
 import Category from '@/lib/models/Category';
 import Banner from '@/lib/models/Banner';
 import Order from '@/lib/models/Order';
-import { initialProducts, initialCategories, initialBanners, initialOrders } from '@/lib/seedData';
+import Offer from '@/lib/models/Offer';
+import DeletedProduct from '@/lib/models/DeletedProduct';
 import { memoryStore } from '@/lib/memoryStore';
 
 export async function GET() {
-  return handleSeed();
+  return handleCleanup();
 }
 
 export async function POST() {
-  return handleSeed();
+  return handleCleanup();
 }
 
-async function handleSeed() {
+export async function DELETE() {
+  return handleCleanup();
+}
+
+async function handleCleanup() {
   try {
     const db = await connectToDatabase();
     if (db) {
-      // Clear existing test collections
-      await Product.deleteMany({});
-      await Category.deleteMany({});
-      await Banner.deleteMany({});
-      await Order.deleteMany({});
+      // Clear demo products with tags or mock slugs
+      await Product.deleteMany({
+        $or: [
+          { tags: { $in: ['audio', 'luxury', 'leather', 'keyboard', 'sunglasses', 'sneakers', 'decor', 'magsafe'] } },
+          { slug: { $in: [
+            'aura-pro-wireless-anc-headphones',
+            'havitall-chrono-swiss-automatic-watch',
+            'roma-handcrafted-leather-briefpack',
+            'nova-84-custom-mechanical-keyboard',
+            'spectra-matrix-polarized-sunglasses',
+            'pulse-ultra-hybrid-carbon-runner',
+            'lumina-smart-mood-bar-rgb-lamp',
+            'velocita-magnetic-leather-magsafe-wallet'
+          ] } },
+        ]
+      });
 
-      // Insert luxury seeded data
-      await Product.insertMany(initialProducts);
-      await Category.insertMany(initialCategories);
-      await Banner.insertMany(initialBanners);
-      await Order.insertMany(initialOrders);
+      // Clear demo banners
+      await Banner.deleteMany({
+        title: { $in: [
+          'Aura Pro Wireless ANC Studio Edition',
+          'HavItAll Chrono Luxury Heritage Watch',
+          'Minimalist Italian Full-Grain Leather Pack',
+          'Cyberpunk Custom RGB Mechanical Keyboard'
+        ] }
+      });
 
-      return NextResponse.json({
-        success: true,
-        message: 'Database seeded successfully with luxury HavItAll demo data!',
-        counts: {
-          products: initialProducts.length,
-          categories: initialCategories.length,
-          banners: initialBanners.length,
-          orders: initialOrders.length,
-        },
-        source: 'mongodb',
+      // Clear demo categories
+      await Category.deleteMany({
+        slug: { $in: [
+          'luxury-watches',
+          'audio-acoustics',
+          'bags-leather',
+          'smart-gadgets',
+          'eyewear-shades',
+          'footwear-kicks'
+        ] }
+      });
+
+      // Clear demo orders
+      await Order.deleteMany({
+        orderNumber: { $in: ['HAV-8092', 'HAV-8091'] }
       });
     }
 
-    // Reset memory store
     if (memoryStore) {
-      memoryStore.products = JSON.parse(JSON.stringify(initialProducts)).map((p: any, i: number) => ({
-        ...p,
-        _id: `prod_${i + 1}`,
-        createdAt: new Date().toISOString(),
-      }));
-      memoryStore.categories = JSON.parse(JSON.stringify(initialCategories)).map((c: any, i: number) => ({
-        ...c,
-        _id: `cat_${i + 1}`,
-      }));
-      memoryStore.banners = JSON.parse(JSON.stringify(initialBanners)).map((b: any, i: number) => ({
-        ...b,
-        _id: `ban_${i + 1}`,
-      }));
-      memoryStore.orders = JSON.parse(JSON.stringify(initialOrders)).map((o: any, i: number) => ({
-        ...o,
-        _id: `ord_${i + 1}`,
-      }));
+      memoryStore.products = [];
+      memoryStore.categories = [];
+      memoryStore.banners = [];
+      memoryStore.orders = [];
+      memoryStore.offers = [];
+      memoryStore.deletedProductIds = [];
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Memory store reset with luxury demo data!',
-      source: 'memory',
+      message: 'All demo data cleaned up successfully! Store is now 100% clean and ready for real Business Koro & custom data.',
     });
   } catch (error: any) {
-    console.error('Error seeding data:', error);
+    console.error('Error cleaning demo data:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

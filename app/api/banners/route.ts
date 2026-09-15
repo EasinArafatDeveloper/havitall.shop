@@ -83,7 +83,7 @@ export async function DELETE(request: Request) {
     }
 
     if (memoryStore) {
-      memoryStore.banners = memoryStore.banners.filter((b) => b._id !== id);
+      memoryStore.banners = memoryStore.banners.filter((b) => b._id !== id && b.title !== id);
     }
 
     return NextResponse.json({ success: true, message: 'Banner removed' });

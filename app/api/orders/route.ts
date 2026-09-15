@@ -9,9 +9,7 @@ export async function GET() {
     const db = await connectToDatabase();
     if (db) {
       const orders = await Order.find().sort({ createdAt: -1 }).lean();
-      if (orders && orders.length > 0) {
-        return NextResponse.json({ success: true, orders, source: 'mongodb' });
-      }
+      return NextResponse.json({ success: true, orders: orders || [], source: 'mongodb' });
     }
 
     return NextResponse.json({
@@ -111,6 +109,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, order: memOrder, source: 'memory' });
   } catch (error: any) {
     console.error('Error creating order:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Order ID is required' }, { status: 400 });
+    }
+
+    const db = await connectToDatabase();
+    if (db) {
+      if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        await Order.findByIdAndDelete(id);
+      } else {
+        await Order.findOneAndDelete({ $or: [{ orderNumber: id.toUpperCase() }, { _id: id }] });
+      }
+    }
+
+    if (memoryStore) {
+      memoryStore.orders = memoryStore.orders.filter(
+        (o) => o._id !== id && o.orderNumber?.toUpperCase() !== id.toUpperCase()
+      );
+    }
+
+    return NextResponse.json({ success: true, message: 'Order deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting order:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

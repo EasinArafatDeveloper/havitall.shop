@@ -109,3 +109,32 @@ export async function PUT(
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const db = await connectToDatabase();
+
+    if (db) {
+      if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        await Order.findByIdAndDelete(id);
+      } else {
+        await Order.findOneAndDelete({ $or: [{ orderNumber: id.toUpperCase() }, { _id: id }] });
+      }
+    }
+
+    if (memoryStore) {
+      memoryStore.orders = memoryStore.orders.filter(
+        (o) => o._id !== id && o.orderNumber?.toUpperCase() !== id.toUpperCase()
+      );
+    }
+
+    return NextResponse.json({ success: true, message: 'Order deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting order:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

@@ -26,8 +26,8 @@ export default function HeroSlider({ initialBanners }: { initialBanners?: Banner
       try {
         const res = await fetch('/api/banners');
         const data = await res.json();
-        if (data.success && data.banners?.length > 0) {
-          setBanners(data.banners);
+        if (data.success) {
+          setBanners(data.banners || []);
         }
       } catch (err) {
         console.error('Failed to load hero banners:', err);

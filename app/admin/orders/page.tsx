@@ -14,7 +14,8 @@ import {
   Phone, 
   ExternalLink,
   Printer,
-  Flame
+  Flame,
+  Trash2
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 
@@ -78,6 +79,25 @@ export default function AdminOrdersPage() {
 
     await handleUpdateStatus(selectedOrder.orderNumber || selectedOrder._id, selectedOrder.orderStatus, customNote);
     setCustomNote('');
+  };
+
+  const handleDeleteOrder = async (orderId: string, orderNum: string) => {
+    if (!confirm(`Are you sure you want to delete order #${orderNum}?`)) return;
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        success(`Order #${orderNum} deleted successfully`);
+        if (selectedOrder && (selectedOrder.orderNumber === orderId || selectedOrder._id === orderId)) {
+          setSelectedOrder(null);
+        }
+        loadOrders();
+      } else {
+        error(data.error || 'Failed to delete order');
+      }
+    } catch (err) {
+      error('Failed to delete order');
+    }
   };
 
   const filteredOrders = orders.filter((o) => {
@@ -214,7 +234,7 @@ export default function AdminOrdersPage() {
                           <option value="Cancelled">Cancelled</option>
                         </select>
                       </td>
-                      <td className="py-3.5 text-right space-x-2">
+                      <td className="py-3.5 text-right space-x-1.5">
                         <button
                           onClick={() => setSelectedOrder(order)}
                           className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
@@ -230,6 +250,13 @@ export default function AdminOrdersPage() {
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                         </Link>
+                        <button
+                          onClick={() => handleDeleteOrder(order.orderNumber || order._id, order.orderNumber)}
+                          className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors"
+                          title="Delete Order"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </td>
                     </tr>
                   );

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Product from '@/lib/models/Product';
+import DeletedProduct from '@/lib/models/DeletedProduct';
 import { memoryStore } from '@/lib/memoryStore';
 import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
 
@@ -12,26 +13,59 @@ export async function GET(request: Request) {
     const isHot = searchParams.get('isHot');
     const isFeatured = searchParams.get('isFeatured');
     const sort = searchParams.get('sort') || 'newest';
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = parseInt(searchParams.get('limit') || '100');
 
     const productMap = new Map<string, any>();
+    const deletedSet = new Set<string>(memoryStore?.deletedProductIds || []);
 
-    // 1. Fetch live products from Business Koro API
-    const bkProducts = await fetchBusinessKoroProducts();
-    if (bkProducts && bkProducts.length > 0) {
-      for (const p of bkProducts) {
-        productMap.set(p.slug || p._id || p.businessKoroId, p);
-      }
-    }
-
-    // 2. Fetch locally saved/updated products from MongoDB
+    // 1. Fetch deleted records from MongoDB
     try {
       const db = await connectToDatabase();
       if (db) {
-        const localProducts = await Product.find().sort({ createdAt: -1 }).lean();
+        const deletedRecords = await DeletedProduct.find().lean();
+        if (deletedRecords && deletedRecords.length > 0) {
+          deletedRecords.forEach((d: any) => {
+            if (d.identifier) deletedSet.add(d.identifier);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('DeletedProduct query warning:', e);
+    }
+
+    // 2. Fetch live products from Business Koro API
+    const bkProducts = await fetchBusinessKoroProducts();
+    if (bkProducts && bkProducts.length > 0) {
+      for (const p of bkProducts) {
+        const key = p.slug || p._id || p.businessKoroId;
+        // Skip if deleted
+        if (
+          deletedSet.has(String(p._id)) ||
+          deletedSet.has(String(p.slug)) ||
+          deletedSet.has(String(p.businessKoroId))
+        ) {
+          continue;
+        }
+        productMap.set(key, p);
+      }
+    }
+
+    // 3. Fetch locally saved/updated products from MongoDB
+    try {
+      const db = await connectToDatabase();
+      if (db) {
+        const localProducts = await Product.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
         if (localProducts && localProducts.length > 0) {
           for (const p of localProducts) {
             const key = p.slug || p._id || p.businessKoroId;
+            // Skip if deleted
+            if (
+              deletedSet.has(String(p._id)) ||
+              deletedSet.has(String(p.slug)) ||
+              deletedSet.has(String(p.businessKoroId))
+            ) {
+              continue;
+            }
             if (productMap.has(key)) {
               productMap.set(key, { ...productMap.get(key), ...p });
             } else {
@@ -44,10 +78,19 @@ export async function GET(request: Request) {
       console.warn('MongoDB query fallback in products API:', e);
     }
 
-    // 3. Fallback to memory store if map is empty
-    if (productMap.size === 0 && memoryStore?.products) {
+    // 4. Memory store products (if any custom added in memory)
+    if (memoryStore?.products && memoryStore.products.length > 0) {
       for (const p of memoryStore.products) {
-        productMap.set(p.slug || p._id || p.businessKoroId, p);
+        const key = p.slug || p._id || p.businessKoroId;
+        if (
+          !deletedSet.has(String(p._id)) &&
+          !deletedSet.has(String(p.slug)) &&
+          !deletedSet.has(String(p.businessKoroId))
+        ) {
+          if (!productMap.has(key)) {
+            productMap.set(key, p);
+          }
+        }
       }
     }
 
@@ -122,6 +165,7 @@ export async function POST(request: Request) {
       discountPercentage: body.originalPrice && body.originalPrice > body.price
         ? Math.round(((body.originalPrice - body.price) / body.originalPrice) * 100)
         : (body.discountPercentage || 0),
+      isDeleted: false,
     };
 
     const db = await connectToDatabase();

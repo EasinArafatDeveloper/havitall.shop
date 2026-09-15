@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Category from '@/lib/models/Category';
-import Product from '@/lib/models/Product';
 import { memoryStore } from '@/lib/memoryStore';
 
 export async function GET() {
@@ -9,9 +8,7 @@ export async function GET() {
     const db = await connectToDatabase();
     if (db) {
       const categories = await Category.find().sort({ name: 1 }).lean();
-      if (categories && categories.length > 0) {
-        return NextResponse.json({ success: true, categories, source: 'mongodb' });
-      }
+      return NextResponse.json({ success: true, categories: categories || [], source: 'mongodb' });
     }
 
     return NextResponse.json({
@@ -85,13 +82,13 @@ export async function DELETE(request: Request) {
       if (id.match(/^[0-9a-fA-F]{24}$/)) {
         await Category.findByIdAndDelete(id);
       } else {
-        await Category.findOneAndDelete({ slug: id });
+        await Category.findOneAndDelete({ $or: [{ slug: id }, { name: id }, { _id: id }] });
       }
     }
 
     if (memoryStore) {
       memoryStore.categories = memoryStore.categories.filter(
-        (c) => c._id !== id && c.slug !== id
+        (c) => c._id !== id && c.slug !== id && c.name !== id
       );
     }
 
