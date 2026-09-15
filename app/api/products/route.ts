@@ -14,31 +14,44 @@ export async function GET(request: Request) {
     const sort = searchParams.get('sort') || 'newest';
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    let allProducts: any[] = [];
+    const productMap = new Map<string, any>();
 
     // 1. Fetch live products from Business Koro API
     const bkProducts = await fetchBusinessKoroProducts();
     if (bkProducts && bkProducts.length > 0) {
-      allProducts.push(...bkProducts);
+      for (const p of bkProducts) {
+        productMap.set(p.slug || p._id || p.businessKoroId, p);
+      }
     }
 
-    // 2. Fetch locally added products from MongoDB
+    // 2. Fetch locally saved/updated products from MongoDB
     try {
       const db = await connectToDatabase();
       if (db) {
         const localProducts = await Product.find().sort({ createdAt: -1 }).lean();
         if (localProducts && localProducts.length > 0) {
-          allProducts.push(...localProducts);
+          for (const p of localProducts) {
+            const key = p.slug || p._id || p.businessKoroId;
+            if (productMap.has(key)) {
+              productMap.set(key, { ...productMap.get(key), ...p });
+            } else {
+              productMap.set(key, p);
+            }
+          }
         }
       }
     } catch (e) {
       console.warn('MongoDB query fallback in products API:', e);
     }
 
-    // 3. Fallback to memory store if no products found yet
-    if (allProducts.length === 0) {
-      allProducts = [...(memoryStore?.products || [])];
+    // 3. Fallback to memory store if map is empty
+    if (productMap.size === 0 && memoryStore?.products) {
+      for (const p of memoryStore.products) {
+        productMap.set(p.slug || p._id || p.businessKoroId, p);
+      }
     }
+
+    const allProducts = Array.from(productMap.values());
 
     // Apply filtering
     let filtered = [...allProducts];

@@ -69,38 +69,39 @@ export async function PUT(
       );
     }
 
+    // 1. Update memory store
+    if (memoryStore) {
+      const memIdx = memoryStore.products.findIndex((p) => p._id === id || p.slug === id || p.businessKoroId === id);
+      if (memIdx >= 0) {
+        memoryStore.products[memIdx] = {
+          ...memoryStore.products[memIdx],
+          ...body,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+    }
+
+    // 2. Update MongoDB if connected
     if (db) {
       let updated = null;
       if (id.match(/^[0-9a-fA-F]{24}$/)) {
         updated = await Product.findByIdAndUpdate(id, body, { new: true }).lean();
       } else {
-        updated = await Product.findOneAndUpdate({ slug: id }, body, { new: true }).lean();
+        updated = await Product.findOneAndUpdate(
+          { $or: [{ slug: id }, { businessKoroId: id }, { _id: id }] },
+          body,
+          { new: true, upsert: true }
+        ).lean();
       }
       if (updated) {
-        // Also update memory store
-        const memIdx = memoryStore?.products.findIndex((p) => p._id === id || p.slug === id);
-        if (memIdx !== undefined && memIdx >= 0) {
-          memoryStore!.products[memIdx] = { ...memoryStore!.products[memIdx], ...updated };
-        }
         return NextResponse.json({ success: true, product: updated, source: 'mongodb' });
       }
     }
 
-    // Memory update
-    const memIdx = memoryStore?.products.findIndex((p) => p._id === id || p.slug === id);
-    if (memIdx === undefined || memIdx === -1) {
-      return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
-    }
-
-    memoryStore!.products[memIdx] = {
-      ...memoryStore!.products[memIdx],
-      ...body,
-      updatedAt: new Date().toISOString(),
-    };
-
+    const memProduct = memoryStore?.products.find((p) => p._id === id || p.slug === id || p.businessKoroId === id);
     return NextResponse.json({
       success: true,
-      product: memoryStore!.products[memIdx],
+      product: memProduct || body,
       source: 'memory',
     });
   } catch (error: any) {

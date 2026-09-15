@@ -95,7 +95,7 @@ export function formatBusinessKoroProduct(item: BusinessKoroRawProduct, index: n
     rating: 4.8,
     numReviews: 24 + (index * 7) % 50,
     isHot: index < 6,
-    isFeatured: true,
+    isFeatured: index < 4,
     isNewArrival: true,
     badge: index % 2 === 0 ? 'Official Supplier' : 'Fast Delivery',
     variants: {

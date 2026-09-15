@@ -1,6 +1,6 @@
 import React from 'react';
 import HeroSlider from '@/components/hero/HeroSlider';
-import CategoryGrid from '@/components/home/CategoryGrid';
+import FeaturedCollections from '@/components/home/FeaturedCollections';
 import HotProductsSection from '@/components/home/HotProductsSection';
 import DealOfTheDay from '@/components/home/DealOfTheDay';
 import { initialProducts, initialCategories, initialBanners } from '@/lib/seedData';
@@ -9,21 +9,22 @@ import connectToDatabase from '@/lib/mongodb';
 import Product from '@/lib/models/Product';
 import Category from '@/lib/models/Category';
 import Banner from '@/lib/models/Banner';
-
 import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 async function getData() {
-  let products: any[] = [];
+  const productMap = new Map<string, any>();
   let categories: any[] = [];
   let banners: any[] = [];
 
   // 1. Fetch live products from Business Koro
   const bkProducts = await fetchBusinessKoroProducts();
   if (bkProducts && bkProducts.length > 0) {
-    products.push(...bkProducts);
+    for (const p of bkProducts) {
+      productMap.set(p.slug || p._id || p.businessKoroId, p);
+    }
   }
 
   // 2. Fetch local products and banners from MongoDB
@@ -35,7 +36,14 @@ async function getData() {
       const localBanners = await Banner.find({ isActive: true }).sort({ order: 1 }).lean();
 
       if (localProducts && localProducts.length > 0) {
-        products.push(...JSON.parse(JSON.stringify(localProducts)));
+        for (const p of JSON.parse(JSON.stringify(localProducts))) {
+          const key = p.slug || p._id || p.businessKoroId;
+          if (productMap.has(key)) {
+            productMap.set(key, { ...productMap.get(key), ...p });
+          } else {
+            productMap.set(key, p);
+          }
+        }
       }
       if (localCategories && localCategories.length > 0) {
         categories = JSON.parse(JSON.stringify(localCategories));
@@ -48,9 +56,11 @@ async function getData() {
     console.error('Database query in page.tsx:', e);
   }
 
-  // Fallback to memory store or seedData if empty
-  if (products.length === 0) {
-    products = memoryStore?.products || initialProducts;
+  // 3. Fallback to memory store if map is empty
+  if (productMap.size === 0 && memoryStore?.products) {
+    for (const p of memoryStore.products) {
+      productMap.set(p.slug || p._id || p.businessKoroId, p);
+    }
   }
   if (categories.length === 0) {
     categories = memoryStore?.categories || initialCategories;
@@ -58,6 +68,8 @@ async function getData() {
   if (banners.length === 0) {
     banners = memoryStore?.banners || initialBanners;
   }
+
+  const products = Array.from(productMap.values());
 
   return {
     products,
@@ -74,8 +86,8 @@ export default async function HomePage() {
       {/* Swipeable Hero Slider */}
       <HeroSlider initialBanners={banners} />
 
-      {/* Categories Department Showcase */}
-      <CategoryGrid categories={categories} />
+      {/* Featured Collections (Curated Real Products Selected by Admin) */}
+      <FeaturedCollections products={products} />
 
       {/* Hot & Trending Products */}
       <HotProductsSection products={products} />
@@ -85,3 +97,4 @@ export default async function HomePage() {
     </div>
   );
 }
+
