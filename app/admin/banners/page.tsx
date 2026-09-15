@@ -41,10 +41,46 @@ export default function AdminBannersPage() {
       const res = await fetch('/api/banners');
       const data = await res.json();
       if (data.success) {
-        setBanners(data.banners || []);
+        if (data.banners && data.banners.length > 0) {
+          setBanners(data.banners);
+          try {
+            localStorage.setItem('havitall_hero_banners', JSON.stringify(data.banners));
+          } catch (e) {}
+        } else {
+          // Check if local cache has stored posters (e.g. after serverless cold start)
+          try {
+            const cachedStr = localStorage.getItem('havitall_hero_banners');
+            if (cachedStr) {
+              const cached = JSON.parse(cachedStr);
+              if (Array.isArray(cached) && cached.length > 0) {
+                setBanners(cached);
+                // Re-sync cached banners to server
+                for (const b of cached) {
+                  fetch('/api/banners', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(b),
+                  }).catch(() => {});
+                }
+              } else {
+                setBanners([]);
+              }
+            } else {
+              setBanners([]);
+            }
+          } catch (e) {
+            setBanners([]);
+          }
+        }
       }
     } catch (err) {
       console.error('Error fetching banners:', err);
+      try {
+        const cachedStr = localStorage.getItem('havitall_hero_banners');
+        if (cachedStr) {
+          setBanners(JSON.parse(cachedStr));
+        }
+      } catch (e) {}
     } finally {
       setLoading(false);
     }
@@ -57,21 +93,21 @@ export default function AdminBannersPage() {
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Are you sure you want to delete this poster?`)) return;
     try {
-      // Optimistic update
-      setBanners((prev) => prev.filter((b) => b._id !== id));
+      const updated = banners.filter((b) => b._id !== id && b.title !== title);
+      setBanners(updated);
+      try {
+        localStorage.setItem('havitall_hero_banners', JSON.stringify(updated));
+      } catch (e) {}
       
       const res = await fetch(`/api/banners?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         success('Hero poster deleted successfully');
-        loadBanners();
       } else {
         error(data.error || 'Failed to delete banner');
-        loadBanners();
       }
     } catch (err) {
       error('Failed to delete banner');
-      loadBanners();
     }
   };
 
@@ -181,6 +217,13 @@ export default function AdminBannersPage() {
         success('New hero poster added to storefront slider! 🎉');
         setIsModalOpen(false);
         setFileDetails(null);
+        if (data.banner) {
+          const updatedList = [data.banner, ...banners.filter((b) => b._id !== data.banner._id)];
+          setBanners(updatedList);
+          try {
+            localStorage.setItem('havitall_hero_banners', JSON.stringify(updatedList));
+          } catch (e) {}
+        }
         loadBanners();
       } else {
         error(data.error || 'Failed to create banner');
