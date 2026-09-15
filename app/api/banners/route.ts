@@ -8,14 +8,12 @@ export async function GET() {
     const db = await connectToDatabase();
     if (db) {
       const banners = await Banner.find({ isActive: true }).sort({ order: 1, createdAt: -1 }).lean();
-      if (banners && banners.length > 0) {
-        return NextResponse.json({ success: true, banners, source: 'mongodb' });
-      }
+      return NextResponse.json({ success: true, banners: banners || [], source: 'mongodb' });
     }
 
     return NextResponse.json({
       success: true,
-      banners: memoryStore?.banners.filter((b) => b.isActive) || [],
+      banners: memoryStore?.banners?.filter((b) => b.isActive) || [],
       source: 'memory',
     });
   } catch (error: any) {
@@ -76,8 +74,12 @@ export async function DELETE(request: Request) {
     }
 
     const db = await connectToDatabase();
-    if (db && id.match(/^[0-9a-fA-F]{24}$/)) {
-      await Banner.findByIdAndDelete(id);
+    if (db) {
+      if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        await Banner.findByIdAndDelete(id);
+      } else {
+        await Banner.findOneAndDelete({ $or: [{ _id: id }, { title: id }] });
+      }
     }
 
     if (memoryStore) {

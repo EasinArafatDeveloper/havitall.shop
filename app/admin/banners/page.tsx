@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, 
   Trash2, 
@@ -8,7 +8,12 @@ import {
   X, 
   ExternalLink,
   ArrowRight,
-  Eye
+  Eye,
+  UploadCloud,
+  Link as LinkIcon,
+  CheckCircle2,
+  FileImage,
+  RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 
@@ -16,7 +21,12 @@ export default function AdminBannersPage() {
   const [banners, setBanners] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { success, error } = useToast();
+  const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [fileDetails, setFileDetails] = useState<{ name: string; size: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { success, error, info } = useToast();
 
   const [formData, setFormData] = useState({
     title: '',
@@ -47,6 +57,9 @@ export default function AdminBannersPage() {
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Are you sure you want to delete this poster?`)) return;
     try {
+      // Optimistic update
+      setBanners((prev) => prev.filter((b) => b._id !== id));
+      
       const res = await fetch(`/api/banners?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
@@ -54,16 +67,99 @@ export default function AdminBannersPage() {
         loadBanners();
       } else {
         error(data.error || 'Failed to delete banner');
+        loadBanners();
       }
     } catch (err) {
       error('Failed to delete banner');
+      loadBanners();
+    }
+  };
+
+  // Process & compress file to optimized Base64
+  const processImageFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      error('Please select an image file (JPG, PNG, WebP).');
+      return;
+    }
+
+    setUploadingFile(true);
+    setFileDetails({
+      name: file.name,
+      size: (file.size / 1024).toFixed(1) + ' KB',
+    });
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // Use canvas to optimize if larger than 1920px width
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        const maxDim = 1920;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/webp', 0.88);
+          setFormData((prev) => ({ ...prev, image: compressedDataUrl }));
+        } else {
+          setFormData((prev) => ({ ...prev, image: e.target?.result as string }));
+        }
+        setUploadingFile(false);
+        success('Poster image uploaded & prepared!');
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => {
+      error('Failed to read file.');
+      setUploadingFile(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processImageFile(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processImageFile(file);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.image.trim()) {
-      error('Please provide a valid Poster Image URL');
+      error('Please upload an image file or provide a valid Image URL');
       return;
     }
 
@@ -84,6 +180,7 @@ export default function AdminBannersPage() {
       if (data.success) {
         success('New hero poster added to storefront slider! 🎉');
         setIsModalOpen(false);
+        setFileDetails(null);
         loadBanners();
       } else {
         error(data.error || 'Failed to create banner');
@@ -102,24 +199,36 @@ export default function AdminBannersPage() {
             Hero Slider Posters
           </h1>
           <p className="text-xs text-slate-500">
-            Posters uploaded here will be displayed as full pure banners in the homepage interactive slider (No overlaid text).
+            Directly upload poster images from your computer to display in the homepage interactive hero slider.
           </p>
         </div>
-        <button
-          onClick={() => {
-            setFormData({
-              title: `Poster #${banners.length + 1}`,
-              image: '',
-              buttonLink: '/shop',
-              order: String(banners.length + 1),
-            });
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Upload New Poster</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadBanners}
+            disabled={loading}
+            className="p-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors"
+            title="Refresh banners"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={() => {
+              setFormData({
+                title: `Poster #${banners.length + 1}`,
+                image: '',
+                buttonLink: '/shop',
+                order: String(banners.length + 1),
+              });
+              setFileDetails(null);
+              setUploadMode('file');
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all self-start sm:self-auto cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Upload New Poster</span>
+          </button>
+        </div>
       </div>
 
       {/* Banners Grid */}
@@ -145,7 +254,7 @@ export default function AdminBannersPage() {
 
               <button
                 onClick={() => handleDelete(banner._id, banner.title)}
-                className="absolute top-3 right-3 p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors shadow-sm"
+                className="absolute top-3 right-3 p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors shadow-sm cursor-pointer"
                 title="Delete poster"
               >
                 <Trash2 className="w-4 h-4" />
@@ -198,40 +307,145 @@ export default function AdminBannersPage() {
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 p-1"
+                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Poster Image URL (High-Res 16:9 or 21:9) *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="https://images.unsplash.com/... or your image link"
-                  value={formData.image}
-                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-950 focus:bg-white"
-                />
-                <p className="text-[10px] text-slate-400">
-                  Tip: Use Canva, Photoshop, or high-res banner URL with offer/text already included on the image.
-                </p>
-              </div>
+            {/* Upload Method Tabs */}
+            <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setUploadMode('file')}
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  uploadMode === 'file'
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-950'
+                }`}
+              >
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span>Upload from Device</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setUploadMode('url')}
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  uploadMode === 'url'
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-950'
+                }`}
+              >
+                <LinkIcon className="w-3.5 h-3.5" />
+                <span>Paste Image Link</span>
+              </button>
+            </div>
 
-              {/* Image Preview if provided */}
-              {formData.image.trim() && (
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              
+              {/* Option A: Direct File Upload Zone */}
+              {uploadMode === 'file' ? (
+                <div className="space-y-2">
+                  <label className="font-bold text-slate-900 block">
+                    Choose Poster Image (Recommended: 1920 × 720 px) <span className="text-rose-600">*</span>
+                  </label>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="image/png, image/jpeg, image/webp, image/jpg"
+                    className="hidden"
+                  />
+
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 ${
+                      isDragging
+                        ? 'border-slate-950 bg-slate-100 scale-[1.01]'
+                        : formData.image
+                        ? 'border-emerald-300 bg-emerald-50/40'
+                        : 'border-slate-300 hover:border-slate-950 bg-slate-50 hover:bg-slate-100/80'
+                    }`}
+                  >
+                    {uploadingFile ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 border-3 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs font-semibold text-slate-600">Optimizing poster image...</span>
+                      </div>
+                    ) : formData.image ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shadow-sm">
+                          <CheckCircle2 className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-emerald-900 text-xs">
+                            {fileDetails?.name || 'Image ready for slider'}
+                          </p>
+                          <p className="text-[10px] text-emerald-700">
+                            {fileDetails?.size ? `Size: ${fileDetails.size} • ` : ''}Click to change or replace file
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-600 flex items-center justify-center shadow-sm">
+                          <UploadCloud className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-xs">
+                            Click to upload or drag & drop poster
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            Supports JPG, PNG, WebP (Widescreen 16:9 / 21:8)
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Option B: Image URL Input */
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-600">Live Poster Preview</label>
-                  <div className="relative aspect-[21/9] w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-50">
+                  <label className="font-bold text-slate-900">Poster Image URL (High-Res 16:9 or 21:9) *</label>
+                  <input
+                    type="text"
+                    required={uploadMode === 'url'}
+                    placeholder="https://images.unsplash.com/... or your image link"
+                    value={formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-950 focus:bg-white"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    Tip: Direct URL of the poster graphic designed with Canva/Photoshop.
+                  </p>
+                </div>
+              )}
+
+              {/* Live Image Preview */}
+              {formData.image.trim() && (
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="font-semibold text-slate-700">Live Poster Preview</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData((prev) => ({ ...prev, image: '' }));
+                        setFileDetails(null);
+                      }}
+                      className="text-[10px] text-rose-600 hover:underline font-semibold"
+                    >
+                      Remove Image
+                    </button>
+                  </div>
+                  <div className="relative aspect-[21/9] w-full rounded-2xl overflow-hidden border border-slate-300 bg-slate-100 shadow-inner">
                     <img
                       src={formData.image}
                       alt="Preview"
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
                     />
                   </div>
                 </div>
@@ -276,13 +490,14 @@ export default function AdminBannersPage() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
+                  className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-all"
+                  disabled={uploadingFile || !formData.image}
+                  className="px-6 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   <span>Publish Poster</span>
                   <ArrowRight className="w-4 h-4" />
