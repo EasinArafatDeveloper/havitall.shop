@@ -7,6 +7,9 @@ declare global {
     orders: any[];
     offers: any[];
     deletedProductIds: string[];
+    featuredProductIds: string[];
+    hotProductIds: string[];
+    productOverrides: { [key: string]: any };
     isInitialized: boolean;
   } | undefined;
 }
@@ -19,6 +22,9 @@ if (!global.__havitallMemoryStore) {
     orders: [],
     offers: [],
     deletedProductIds: [],
+    featuredProductIds: [],
+    hotProductIds: [],
+    productOverrides: {},
     isInitialized: true,
   };
 }

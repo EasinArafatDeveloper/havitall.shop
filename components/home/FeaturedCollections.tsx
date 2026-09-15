@@ -21,12 +21,7 @@ export default function FeaturedCollections({ products }: FeaturedCollectionsPro
   const [quickViewProduct, setQuickViewProduct] = useState<any | null>(null);
 
   // Filter ONLY products marked as featured
-  const featuredProducts = (products || []).filter((p) => Boolean(p.isFeatured));
-
-  // Fallback if no products are marked yet (show first 4 verified products)
-  const displayProducts = featuredProducts.length > 0 
-    ? featuredProducts 
-    : (products || []).slice(0, 4);
+  const displayProducts = (products || []).filter((p) => Boolean(p.isFeatured));
 
   return (
     <section className="py-12 sm:py-16 bg-white border-y border-slate-200">

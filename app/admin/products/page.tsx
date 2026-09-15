@@ -53,7 +53,26 @@ export default function AdminProductsPage() {
       ]);
       const prodData = await prodRes.json();
       const catData = await catRes.json();
-      if (prodData.success) setProducts(prodData.products || []);
+      if (prodData.success) {
+        let loadedProducts = prodData.products || [];
+        
+        // Sync with local featured cache if available
+        try {
+          const cachedFeatStr = localStorage.getItem('havitall_featured_ids');
+          if (cachedFeatStr) {
+            const featIds: string[] = JSON.parse(cachedFeatStr);
+            if (Array.isArray(featIds) && featIds.length > 0) {
+              const featSet = new Set(featIds);
+              loadedProducts = loadedProducts.map((p: any) => ({
+                ...p,
+                isFeatured: featSet.has(p._id) || featSet.has(p.slug) || featSet.has(p.businessKoroId) || Boolean(p.isFeatured),
+              }));
+            }
+          }
+        } catch (e) {}
+
+        setProducts(loadedProducts);
+      }
       if (catData.success) setCategories(catData.categories || []);
     } catch (err) {
       console.error('Error fetching admin products:', err);
@@ -68,22 +87,37 @@ export default function AdminProductsPage() {
 
   const handleToggleFeatured = async (product: any) => {
     const newStatus = !product.isFeatured;
-    const targetId = product._id || product.slug || product.businessKoroId;
+    const targetId = product.slug || product._id || product.businessKoroId;
 
     // Optimistic UI update
-    setProducts((prev) =>
-      prev.map((p) =>
-        (p._id === product._id || p.slug === product.slug || p.businessKoroId === product.businessKoroId)
-          ? { ...p, isFeatured: newStatus }
-          : p
-      )
+    const updatedProducts = products.map((p) =>
+      (p._id === product._id || p.slug === product.slug || p.businessKoroId === product.businessKoroId)
+        ? { ...p, isFeatured: newStatus }
+        : p
     );
+    setProducts(updatedProducts);
+
+    // Save to localStorage
+    try {
+      const activeFeatured = updatedProducts.filter((p) => Boolean(p.isFeatured)).map((p) => p.slug || p._id || p.businessKoroId);
+      localStorage.setItem('havitall_featured_ids', JSON.stringify(activeFeatured));
+    } catch (e) {}
 
     try {
       const res = await fetch(`/api/products/${targetId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isFeatured: newStatus }),
+        body: JSON.stringify({
+          isFeatured: newStatus,
+          name: product.name,
+          slug: product.slug,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          category: product.category,
+          images: product.images,
+          stock: product.stock,
+          description: product.description,
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -93,33 +127,40 @@ export default function AdminProductsPage() {
           info(`Removed "${product.name}" from Featured Collections.`);
         }
       } else {
-        error('Failed to update featured status');
-        loadData();
+        error('Failed to update featured status on server');
       }
     } catch (err) {
-      error('Network error updating status');
-      loadData();
+      error('Network warning updating status');
     }
   };
 
   const handleToggleHot = async (product: any) => {
     const newStatus = !product.isHot;
-    const targetId = product._id || product.slug || product.businessKoroId;
+    const targetId = product.slug || product._id || product.businessKoroId;
 
     // Optimistic UI update
-    setProducts((prev) =>
-      prev.map((p) =>
-        (p._id === product._id || p.slug === product.slug || p.businessKoroId === product.businessKoroId)
-          ? { ...p, isHot: newStatus }
-          : p
-      )
+    const updatedProducts = products.map((p) =>
+      (p._id === product._id || p.slug === product.slug || p.businessKoroId === product.businessKoroId)
+        ? { ...p, isHot: newStatus }
+        : p
     );
+    setProducts(updatedProducts);
 
     try {
       const res = await fetch(`/api/products/${targetId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isHot: newStatus }),
+        body: JSON.stringify({
+          isHot: newStatus,
+          name: product.name,
+          slug: product.slug,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          category: product.category,
+          images: product.images,
+          stock: product.stock,
+          description: product.description,
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -128,11 +169,9 @@ export default function AdminProductsPage() {
         } else {
           info(`Removed "${product.name}" from Hot Deals.`);
         }
-      } else {
-        loadData();
       }
     } catch (err) {
-      loadData();
+      console.warn('Network error:', err);
     }
   };
 

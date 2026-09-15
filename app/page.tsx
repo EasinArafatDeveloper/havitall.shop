@@ -10,6 +10,7 @@ import Category from '@/lib/models/Category';
 import Banner from '@/lib/models/Banner';
 import Offer from '@/lib/models/Offer';
 import DeletedProduct from '@/lib/models/DeletedProduct';
+import FeaturedProduct from '@/lib/models/FeaturedProduct';
 import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
 
 export const dynamic = 'force-dynamic';
@@ -18,23 +19,44 @@ export const revalidate = 0;
 async function getData() {
   const productMap = new Map<string, any>();
   const deletedSet = new Set<string>(memoryStore?.deletedProductIds || []);
+  const featuredSet = new Set<string>(memoryStore?.featuredProductIds || []);
+  const hotSet = new Set<string>(memoryStore?.hotProductIds || []);
   let categories: any[] = [];
   let banners: any[] = [];
   let offers: any[] = [];
 
-  // 1. Fetch deleted identifiers from MongoDB
+  // 1. Fetch deleted and featured identifiers from MongoDB
   try {
     const db = await connectToDatabase();
     if (db) {
-      const deletedRecords = await DeletedProduct.find().lean();
+      const [deletedRecords, featuredRecords] = await Promise.all([
+        DeletedProduct.find().lean(),
+        FeaturedProduct.find().lean(),
+      ]);
+
       if (deletedRecords && deletedRecords.length > 0) {
         deletedRecords.forEach((d: any) => {
           if (d.identifier) deletedSet.add(d.identifier);
         });
       }
+
+      if (featuredRecords && featuredRecords.length > 0) {
+        featuredRecords.forEach((f: any) => {
+          if (f.isFeatured && f.identifier) {
+            featuredSet.add(f.identifier);
+          } else if (f.isFeatured === false && f.identifier) {
+            featuredSet.delete(f.identifier);
+          }
+          if (f.isHot && f.identifier) {
+            hotSet.add(f.identifier);
+          } else if (f.isHot === false && f.identifier) {
+            hotSet.delete(f.identifier);
+          }
+        });
+      }
     }
   } catch (e) {
-    console.warn('DeletedProduct check in page.tsx:', e);
+    console.warn('DeletedProduct/FeaturedProduct check in page.tsx:', e);
   }
 
   // 2. Fetch live products from Business Koro
@@ -48,7 +70,20 @@ async function getData() {
       ) {
         continue;
       }
-      productMap.set(p.slug || p._id || p.businessKoroId, p);
+
+      const isFeat =
+        featuredSet.has(String(p._id)) ||
+        featuredSet.has(String(p.slug)) ||
+        featuredSet.has(String(p.businessKoroId)) ||
+        Boolean(p.isFeatured);
+
+      const isH =
+        hotSet.has(String(p._id)) ||
+        hotSet.has(String(p.slug)) ||
+        hotSet.has(String(p.businessKoroId)) ||
+        Boolean(p.isHot);
+
+      productMap.set(p.slug || p._id || p.businessKoroId, { ...p, isFeatured: isFeat, isHot: isH });
     }
   }
 
@@ -71,10 +106,25 @@ async function getData() {
             continue;
           }
           const key = p.slug || p._id || p.businessKoroId;
+
+          const isFeat =
+            featuredSet.has(String(p._id)) ||
+            featuredSet.has(String(p.slug)) ||
+            featuredSet.has(String(p.businessKoroId)) ||
+            Boolean(p.isFeatured);
+
+          const isH =
+            hotSet.has(String(p._id)) ||
+            hotSet.has(String(p.slug)) ||
+            hotSet.has(String(p.businessKoroId)) ||
+            Boolean(p.isHot);
+
+          const merged = { ...p, isFeatured: isFeat, isHot: isH };
+
           if (productMap.has(key)) {
-            productMap.set(key, { ...productMap.get(key), ...p });
+            productMap.set(key, { ...productMap.get(key), ...merged });
           } else {
-            productMap.set(key, p);
+            productMap.set(key, merged);
           }
         }
       }
@@ -100,7 +150,19 @@ async function getData() {
         !deletedSet.has(String(p.slug)) &&
         !deletedSet.has(String(p.businessKoroId))
       ) {
-        productMap.set(p.slug || p._id || p.businessKoroId, p);
+        const isFeat =
+          featuredSet.has(String(p._id)) ||
+          featuredSet.has(String(p.slug)) ||
+          featuredSet.has(String(p.businessKoroId)) ||
+          Boolean(p.isFeatured);
+
+        const isH =
+          hotSet.has(String(p._id)) ||
+          hotSet.has(String(p.slug)) ||
+          hotSet.has(String(p.businessKoroId)) ||
+          Boolean(p.isHot);
+
+        productMap.set(p.slug || p._id || p.businessKoroId, { ...p, isFeatured: isFeat, isHot: isH });
       }
     }
   }

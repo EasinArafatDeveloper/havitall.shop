@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Product from '@/lib/models/Product';
 import DeletedProduct from '@/lib/models/DeletedProduct';
+import FeaturedProduct from '@/lib/models/FeaturedProduct';
 import { memoryStore } from '@/lib/memoryStore';
 import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
 
@@ -17,20 +18,41 @@ export async function GET(request: Request) {
 
     const productMap = new Map<string, any>();
     const deletedSet = new Set<string>(memoryStore?.deletedProductIds || []);
+    const featuredSet = new Set<string>(memoryStore?.featuredProductIds || []);
+    const hotSet = new Set<string>(memoryStore?.hotProductIds || []);
 
-    // 1. Fetch deleted records from MongoDB
+    // 1. Fetch deleted and featured records from MongoDB
     try {
       const db = await connectToDatabase();
       if (db) {
-        const deletedRecords = await DeletedProduct.find().lean();
+        const [deletedRecords, featuredRecords] = await Promise.all([
+          DeletedProduct.find().lean(),
+          FeaturedProduct.find().lean(),
+        ]);
+
         if (deletedRecords && deletedRecords.length > 0) {
           deletedRecords.forEach((d: any) => {
             if (d.identifier) deletedSet.add(d.identifier);
           });
         }
+
+        if (featuredRecords && featuredRecords.length > 0) {
+          featuredRecords.forEach((f: any) => {
+            if (f.isFeatured && f.identifier) {
+              featuredSet.add(f.identifier);
+            } else if (f.isFeatured === false && f.identifier) {
+              featuredSet.delete(f.identifier);
+            }
+            if (f.isHot && f.identifier) {
+              hotSet.add(f.identifier);
+            } else if (f.isHot === false && f.identifier) {
+              hotSet.delete(f.identifier);
+            }
+          });
+        }
       }
     } catch (e) {
-      console.warn('DeletedProduct query warning:', e);
+      console.warn('DB query warning in products route:', e);
     }
 
     // 2. Fetch live products from Business Koro API
@@ -46,7 +68,20 @@ export async function GET(request: Request) {
         ) {
           continue;
         }
-        productMap.set(key, p);
+
+        const isFeat =
+          featuredSet.has(String(p._id)) ||
+          featuredSet.has(String(p.slug)) ||
+          featuredSet.has(String(p.businessKoroId)) ||
+          Boolean(p.isFeatured);
+
+        const isH =
+          hotSet.has(String(p._id)) ||
+          hotSet.has(String(p.slug)) ||
+          hotSet.has(String(p.businessKoroId)) ||
+          Boolean(p.isHot);
+
+        productMap.set(key, { ...p, isFeatured: isFeat, isHot: isH });
       }
     }
 
@@ -66,10 +101,25 @@ export async function GET(request: Request) {
             ) {
               continue;
             }
+
+            const isFeat =
+              featuredSet.has(String(p._id)) ||
+              featuredSet.has(String(p.slug)) ||
+              featuredSet.has(String(p.businessKoroId)) ||
+              Boolean(p.isFeatured);
+
+            const isH =
+              hotSet.has(String(p._id)) ||
+              hotSet.has(String(p.slug)) ||
+              hotSet.has(String(p.businessKoroId)) ||
+              Boolean(p.isHot);
+
+            const merged = { ...p, isFeatured: isFeat, isHot: isH };
+
             if (productMap.has(key)) {
-              productMap.set(key, { ...productMap.get(key), ...p });
+              productMap.set(key, { ...productMap.get(key), ...merged });
             } else {
-              productMap.set(key, p);
+              productMap.set(key, merged);
             }
           }
         }
@@ -87,8 +137,20 @@ export async function GET(request: Request) {
           !deletedSet.has(String(p.slug)) &&
           !deletedSet.has(String(p.businessKoroId))
         ) {
+          const isFeat =
+            featuredSet.has(String(p._id)) ||
+            featuredSet.has(String(p.slug)) ||
+            featuredSet.has(String(p.businessKoroId)) ||
+            Boolean(p.isFeatured);
+
+          const isH =
+            hotSet.has(String(p._id)) ||
+            hotSet.has(String(p.slug)) ||
+            hotSet.has(String(p.businessKoroId)) ||
+            Boolean(p.isHot);
+
           if (!productMap.has(key)) {
-            productMap.set(key, p);
+            productMap.set(key, { ...p, isFeatured: isFeat, isHot: isH });
           }
         }
       }
@@ -166,6 +228,8 @@ export async function POST(request: Request) {
         ? Math.round(((body.originalPrice - body.price) / body.originalPrice) * 100)
         : (body.discountPercentage || 0),
       isDeleted: false,
+      isFeatured: body.isFeatured ?? false,
+      isHot: body.isHot ?? false,
     };
 
     const db = await connectToDatabase();
