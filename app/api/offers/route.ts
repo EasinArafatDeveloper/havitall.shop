@@ -13,9 +13,7 @@ export async function GET(request: Request) {
       if (db) {
         const filter = activeOnly ? { isActive: true } : {};
         const offers = await Offer.find(filter).sort({ order: 1, createdAt: -1 }).lean();
-        if (offers && offers.length > 0) {
-          return NextResponse.json({ success: true, offers, source: 'mongodb' });
-        }
+        return NextResponse.json({ success: true, offers: offers || [], source: 'mongodb' });
       }
     } catch (e) {
       console.warn('MongoDB query warning for offers:', e);
@@ -28,7 +26,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      offers,
+      offers: offers || [],
       source: 'memory',
     });
   } catch (error: any) {
@@ -56,12 +54,10 @@ export async function POST(request: Request) {
       order = 1,
     } = body;
 
-    if (!productId || !productName || !productImage) {
-      return NextResponse.json(
-        { success: false, error: 'Product ID, Name, and Image are required to create a flash offer.' },
-        { status: 400 }
-      );
-    }
+    const name = productName || 'Flash Deal Product';
+    const image = productImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000';
+    const slug = productSlug || productId || name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const pId = productId || slug || `prod_${Date.now()}`;
 
     const origPrice = Number(originalPrice) || Number(offerPrice) || 1000;
     const offPrice = Number(offerPrice) || Number(originalPrice) || 1000;
@@ -70,54 +66,60 @@ export async function POST(request: Request) {
       : (body.discountPercentage || 0);
 
     const newOfferData = {
-      productId,
-      productName,
-      productImage,
-      productSlug: productSlug || productName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      productId: String(pId),
+      productName: name,
+      productImage: image,
+      productSlug: slug,
       originalPrice: origPrice,
       offerPrice: offPrice,
       discountPercentage,
-      title: title || 'Limited Flash Deal',
+      title: title || `Special Flash Deal on ${name}`,
       subtitle: subtitle || 'Exclusive flash offer on our verified luxury collection.',
       badgeText: badgeText || '⚡ LIMITED FLASH DEAL',
-      couponCode: couponCode || 'HAVITALL20',
+      couponCode: (couponCode || 'HAVITALL20').toUpperCase().trim(),
       endDate: endDate || new Date(Date.now() + 86400000 * 2).toISOString(),
       isActive: Boolean(isActive),
       order: Number(order) || 1,
     };
 
-    const db = await connectToDatabase();
-    if (db) {
-      // If new offer is active, ensure we don't have more than 2 active offers
-      if (newOfferData.isActive) {
-        const activeOffers = await Offer.find({ isActive: true }).sort({ updatedAt: 1 });
-        if (activeOffers.length >= 2) {
-          // Deactivate the oldest active offer to keep max 2 active
-          await Offer.findByIdAndUpdate(activeOffers[0]._id, { isActive: false });
-        }
-      }
-
-      const offer = await Offer.create(newOfferData);
-      
-      // Update memory store
-      if (memoryStore) {
+    try {
+      const db = await connectToDatabase();
+      if (db) {
+        // If new offer is active, ensure we don't have more than 2 active offers
         if (newOfferData.isActive) {
-          const activeMem = memoryStore.offers.filter((o) => o.isActive);
-          if (activeMem.length >= 2) {
-            activeMem[0].isActive = false;
+          const activeOffers = await Offer.find({ isActive: true }).sort({ updatedAt: 1 });
+          if (activeOffers.length >= 2) {
+            // Deactivate the oldest active offer to keep max 2 active
+            await Offer.findByIdAndUpdate(activeOffers[0]._id, { isActive: false });
           }
         }
-        memoryStore.offers.unshift(offer.toObject());
-      }
 
-      return NextResponse.json({ success: true, offer, source: 'mongodb' });
+        const offer = await Offer.create(newOfferData);
+        
+        // Update memory store
+        if (memoryStore) {
+          if (newOfferData.isActive) {
+            const activeMem = memoryStore.offers.filter((o) => o.isActive);
+            if (activeMem.length >= 2) {
+              activeMem[0].isActive = false;
+            }
+          }
+          memoryStore.offers.unshift(offer.toObject());
+        }
+
+        return NextResponse.json({ success: true, offer, source: 'mongodb' });
+      }
+    } catch (e) {
+      console.warn('MongoDB create warning:', e);
     }
 
     // Memory Store fallback
-    if (newOfferData.isActive && memoryStore) {
-      const activeMem = memoryStore.offers.filter((o) => o.isActive);
-      if (activeMem.length >= 2) {
-        activeMem[0].isActive = false;
+    if (memoryStore) {
+      if (newOfferData.isActive) {
+        const activeMem = memoryStore.offers.filter((o) => o.isActive);
+        if (activeMem.length >= 2) {
+          activeMem[0].isActive = false;
+        }
       }
     }
 

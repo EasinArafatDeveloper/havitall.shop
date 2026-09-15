@@ -18,7 +18,8 @@ import {
   X,
   Flame,
   ArrowRight,
-  Eye
+  Eye,
+  RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 
@@ -78,8 +79,8 @@ export default function AdminOffersPage() {
       if (offersData.success) {
         setOffers(offersData.offers || []);
       }
-      if (prodsData.success) {
-        setProducts(prodsData.products || []);
+      if (prodsData.success && prodsData.products) {
+        setProducts(prodsData.products);
       }
     } catch (err) {
       console.error('Error loading offers:', err);
@@ -96,13 +97,15 @@ export default function AdminOffersPage() {
 
   const handleOpenCreateModal = () => {
     setEditingOffer(null);
-    setSelectedProduct(products[0] || null);
-    if (products[0]) {
-      const orig = Number(products[0].originalPrice || products[0].price * 1.3 || 4500);
-      const off = Number(products[0].price || 3150);
+    const firstProd = products[0] || null;
+    setSelectedProduct(firstProd);
+    
+    if (firstProd) {
+      const orig = Number(firstProd.originalPrice || firstProd.price * 1.3 || 4500);
+      const off = Number(firstProd.price || 3150);
       const disc = Math.round(((orig - off) / orig) * 100) || 25;
       setFormData({
-        title: `Exclusive Flash Deal on ${products[0].name.slice(0, 30)}`,
+        title: `Exclusive Flash Deal on ${firstProd.name.slice(0, 32)}`,
         subtitle: 'Limited-time special pricing on our top-rated luxury selection.',
         badgeText: '🔥 LIMITED FLASH DEAL',
         couponCode: 'HAVITALL25',
@@ -112,13 +115,25 @@ export default function AdminOffersPage() {
         durationHours: 48,
         isActive: true,
       });
+    } else {
+      setFormData({
+        title: 'Exclusive Flash Deal',
+        subtitle: 'Limited-time special pricing on our top-rated luxury selection.',
+        badgeText: '🔥 LIMITED FLASH DEAL',
+        couponCode: 'HAVITALL25',
+        originalPrice: 4500,
+        offerPrice: 3150,
+        discountPercentage: 30,
+        durationHours: 48,
+        isActive: true,
+      });
     }
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (offer: OfferItem) => {
     setEditingOffer(offer);
-    const matchedProd = products.find((p) => p._id === offer.productId || p.slug === offer.productSlug);
+    const matchedProd = products.find((p) => String(p._id) === String(offer.productId) || p.slug === offer.productSlug);
     setSelectedProduct(matchedProd || {
       _id: offer.productId,
       name: offer.productName,
@@ -157,7 +172,7 @@ export default function AdminOffersPage() {
     
     setFormData((prev) => ({
       ...prev,
-      title: `Special Flash Deal on ${prod.name.slice(0, 30)}`,
+      title: `Special Flash Deal on ${prod.name.slice(0, 32)}`,
       originalPrice: orig,
       offerPrice: off,
       discountPercentage: disc,
@@ -188,7 +203,7 @@ export default function AdminOffersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct) {
-      error('Please select a product for the flash offer.');
+      error('Please select a product from the catalog list.');
       return;
     }
 
@@ -197,10 +212,10 @@ export default function AdminOffersPage() {
       const endDate = new Date(Date.now() + formData.durationHours * 60 * 60 * 1000).toISOString();
 
       const payload = {
-        productId: selectedProduct._id || selectedProduct.id || selectedProduct.slug,
-        productName: selectedProduct.name,
+        productId: String(selectedProduct._id || selectedProduct.id || selectedProduct.slug || `prod_${Date.now()}`),
+        productName: selectedProduct.name || formData.title,
         productImage: selectedProduct.images?.[0] || selectedProduct.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000',
-        productSlug: selectedProduct.slug || selectedProduct._id,
+        productSlug: selectedProduct.slug || selectedProduct._id || 'flash-deal',
         originalPrice: Number(formData.originalPrice),
         offerPrice: Number(formData.offerPrice),
         discountPercentage: Number(formData.discountPercentage),
@@ -249,7 +264,12 @@ export default function AdminOffersPage() {
         info('Max 2 active offers allowed. Oldest active offer will be replaced.');
       }
 
-      const res = await fetch(`/api/offers/${offer._id}`, {
+      // Optimistic update
+      setOffers((prev) =>
+        prev.map((o) => (o._id === offer._id ? { ...o, isActive: newStatus } : o))
+      );
+
+      const res = await fetch(`/api/offers/${offer._id || offer.productId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: newStatus }),
@@ -261,15 +281,20 @@ export default function AdminOffersPage() {
         loadData();
       } else {
         error(data.error || 'Failed to update offer status.');
+        loadData();
       }
     } catch (err) {
       error('Failed to toggle active status.');
+      loadData();
     }
   };
 
   const handleDeleteOffer = async (offerId: string) => {
     if (!confirm('Are you sure you want to delete this flash offer?')) return;
     try {
+      // Optimistic update
+      setOffers((prev) => prev.filter((o) => o._id !== offerId && o.productId !== offerId));
+
       const res = await fetch(`/api/offers/${offerId}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
@@ -277,9 +302,11 @@ export default function AdminOffersPage() {
         loadData();
       } else {
         error(data.error || 'Failed to delete offer.');
+        loadData();
       }
     } catch (err) {
       error('Failed to delete offer.');
+      loadData();
     }
   };
 
@@ -306,13 +333,23 @@ export default function AdminOffersPage() {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreateModal}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all transform active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Create New Flash Deal</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="p-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors"
+            title="Refresh Offers"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={handleOpenCreateModal}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all transform active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create New Flash Deal</span>
+          </button>
+        </div>
       </div>
 
       {/* Info Status Cards */}
@@ -360,14 +397,14 @@ export default function AdminOffersPage() {
         </h2>
 
         {offers.length === 0 ? (
-          <div className="p-12 text-center bg-white border border-slate-200 rounded-3xl space-y-4">
+          <div className="p-12 text-center bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
             <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
               <Sparkles className="w-8 h-8" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-950">No flash deals created yet</h3>
+              <h3 className="text-base font-bold text-slate-950">No flash deals configured yet</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                Create a flash deal by selecting a product from your catalog and setting a discount price and countdown timer.
+                Create your first flash deal by picking a product from your catalog and setting a special price.
               </p>
             </div>
             <button
@@ -381,7 +418,7 @@ export default function AdminOffersPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {offers.map((offer) => (
               <div
-                key={offer._id}
+                key={offer._id || offer.productId}
                 className={`p-6 rounded-3xl border transition-all ${
                   offer.isActive
                     ? 'bg-white border-slate-900 shadow-md ring-1 ring-slate-950'
@@ -408,7 +445,7 @@ export default function AdminOffersPage() {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleToggleActive(offer)}
-                      className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${
+                      className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
                         offer.isActive
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                           : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
@@ -419,14 +456,14 @@ export default function AdminOffersPage() {
                     </button>
                     <button
                       onClick={() => handleOpenEditModal(offer)}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors"
+                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
                       title="Edit Offer"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => offer._id && handleDeleteOffer(offer._id)}
-                      className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors"
+                      onClick={() => (offer._id || offer.productId) && handleDeleteOffer(offer._id || offer.productId)}
+                      className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors cursor-pointer"
                       title="Delete Offer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -479,7 +516,7 @@ export default function AdminOffersPage() {
 
                 {/* Homepage Preview Banner */}
                 <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-[11px] text-slate-500 font-medium">
+                  <span className="text-[11px] text-slate-500 font-medium truncate max-w-[200px]">
                     Target: <strong className="text-slate-800">{offer.productName}</strong>
                   </span>
                   <Link
@@ -517,7 +554,7 @@ export default function AdminOffersPage() {
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 p-1"
+                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -529,6 +566,22 @@ export default function AdminOffersPage() {
                 <label className="text-xs font-bold text-slate-900 block">
                   1. Select Product from Catalog <span className="text-rose-600">*</span>
                 </label>
+
+                {/* Selected Product summary badge */}
+                {selectedProduct && (
+                  <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-100 border border-slate-300">
+                    <img
+                      src={selectedProduct.images?.[0] || selectedProduct.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'}
+                      alt={selectedProduct.name}
+                      className="w-12 h-12 object-contain rounded-xl bg-white border border-slate-200 p-1 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[10px] font-bold uppercase text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">Selected Product</span>
+                      <p className="text-xs font-bold text-slate-950 truncate mt-0.5">{selectedProduct.name}</p>
+                      <p className="text-[11px] text-slate-500">Regular Price: ৳{selectedProduct.originalPrice || selectedProduct.price}</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Search in products */}
                 <div className="relative">
@@ -544,33 +597,37 @@ export default function AdminOffersPage() {
 
                 {/* Product Select List */}
                 <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl bg-slate-50 p-2 space-y-1">
-                  {filteredProducts.slice(0, 15).map((prod) => {
-                    const isSel = selectedProduct && (selectedProduct._id === prod._id || selectedProduct.slug === prod.slug);
-                    return (
-                      <div
-                        key={prod._id || prod.slug}
-                        onClick={() => handleSelectProduct(prod)}
-                        className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-colors ${
-                          isSel
-                            ? 'bg-slate-950 text-white font-semibold'
-                            : 'hover:bg-slate-200/70 text-slate-900'
-                        }`}
-                      >
-                        <img
-                          src={prod.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'}
-                          alt={prod.name}
-                          className="w-10 h-10 object-contain rounded-lg bg-white border border-slate-200 p-0.5"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs truncate">{prod.name}</p>
-                          <p className={`text-[11px] ${isSel ? 'text-slate-300' : 'text-slate-500'}`}>
-                            {prod.category} • Current Price: ৳{prod.price}
-                          </p>
+                  {filteredProducts.length === 0 ? (
+                    <p className="text-center text-slate-400 py-3 text-xs">No products found matching "{productSearch}"</p>
+                  ) : (
+                    filteredProducts.slice(0, 20).map((prod) => {
+                      const isSel = selectedProduct && (String(selectedProduct._id) === String(prod._id) || selectedProduct.slug === prod.slug);
+                      return (
+                        <div
+                          key={prod._id || prod.slug}
+                          onClick={() => handleSelectProduct(prod)}
+                          className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-colors ${
+                            isSel
+                              ? 'bg-slate-950 text-white font-semibold'
+                              : 'hover:bg-slate-200/70 text-slate-900'
+                          }`}
+                        >
+                          <img
+                            src={prod.images?.[0] || prod.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'}
+                            alt={prod.name}
+                            className="w-10 h-10 object-contain rounded-lg bg-white border border-slate-200 p-0.5"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs truncate">{prod.name}</p>
+                            <p className={`text-[11px] ${isSel ? 'text-slate-300' : 'text-slate-500'}`}>
+                              {prod.category} • Current Price: ৳{prod.price}
+                            </p>
+                          </div>
+                          {isSel && <Check className="w-4 h-4 text-emerald-400 shrink-0" />}
                         </div>
-                        {isSel && <Check className="w-4 h-4 text-emerald-400 shrink-0" />}
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
@@ -704,14 +761,14 @@ export default function AdminOffersPage() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-950 transition-colors"
+                  className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-950 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-6 py-2.5 bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2"
+                  className="px-6 py-2.5 bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
                 >
                   {submitting && <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                   <span>{editingOffer ? 'Save Changes' : 'Create Flash Deal'}</span>
