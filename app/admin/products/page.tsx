@@ -192,16 +192,16 @@ export default function AdminProductsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black font-display text-white">
+          <h1 className="text-2xl sm:text-3xl font-black font-display text-slate-950">
             Product Management
           </h1>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             Create, update, manage prices, stocks, and variant parameters.
           </p>
         </div>
         <button
           onClick={handleOpenAdd}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 via-rose-600 to-amber-500 hover:from-brand-500 text-white font-bold text-xs shadow-lg shadow-rose-950 transition-all self-start sm:self-auto"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>Add New Product</span>
@@ -209,14 +209,14 @@ export default function AdminProductsPage() {
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-dark-100 border border-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <input
             type="text"
             placeholder="Search products..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700/80 rounded-xl py-2 pl-10 pr-4 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-rose-500"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-950 focus:bg-white"
           />
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
         </div>
@@ -225,7 +225,7 @@ export default function AdminProductsPage() {
           <select
             value={selectedCat}
             onChange={(e) => setSelectedCat(e.target.value)}
-            className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-rose-500"
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:border-slate-950"
           >
             <option value="all">All Categories</option>
             {categories.map((c) => (
@@ -234,18 +234,18 @@ export default function AdminProductsPage() {
               </option>
             ))}
           </select>
-          <span className="text-xs text-slate-400 font-semibold">
+          <span className="text-xs text-slate-500 font-semibold">
             {filteredProducts.length} items
           </span>
         </div>
       </div>
 
       {/* Products Table */}
-      <div className="p-6 rounded-3xl bg-dark-100 border border-slate-800 overflow-hidden shadow-xl">
+      <div className="p-6 rounded-3xl bg-white border border-slate-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider font-semibold">
+              <tr className="border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
                 <th className="pb-3">Product</th>
                 <th className="pb-3">Category</th>
                 <th className="pb-3">Price</th>
@@ -254,28 +254,28 @@ export default function AdminProductsPage() {
                 <th className="pb-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100">
               {filteredProducts.map((product) => (
-                <tr key={product._id || product.slug} className="hover:bg-slate-900/50 transition-colors">
+                <tr key={product._id || product.slug} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3 flex items-center gap-3">
                     <img
                       src={product.images?.[0] || product.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=200'}
                       alt={product.name}
-                      className="w-12 h-12 object-cover rounded-xl bg-slate-900 border border-slate-800 shrink-0"
+                      className="w-12 h-12 object-contain rounded-xl bg-slate-50 border border-slate-200 p-1 shrink-0"
                     />
                     <div className="max-w-xs">
-                      <p className="font-bold text-white truncate">{product.name}</p>
-                      <p className="text-[11px] text-slate-400 truncate">{product.shortDescription}</p>
+                      <p className="font-bold text-slate-950 truncate">{product.name}</p>
+                      <p className="text-[11px] text-slate-500 truncate">{product.shortDescription}</p>
                     </div>
                   </td>
-                  <td className="py-3 capitalize text-rose-400/90 font-medium">
+                  <td className="py-3 capitalize text-slate-700 font-medium">
                     {product.category?.replace('-', ' ')}
                   </td>
                   <td className="py-3">
                     <div className="flex flex-col">
-                      <span className="font-bold text-white">৳{product.price?.toLocaleString()}</span>
+                      <span className="font-bold text-slate-950">৳{product.price?.toLocaleString()}</span>
                       {product.originalPrice && (
-                        <span className="text-[10px] text-slate-500 line-through">
+                        <span className="text-[10px] text-slate-400 line-through">
                           ৳{product.originalPrice?.toLocaleString()}
                         </span>
                       )}
@@ -285,8 +285,8 @@ export default function AdminProductsPage() {
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                         product.stock > 0
-                          ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-rose-950/60 text-rose-400 border border-rose-500/30'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200'
                       }`}
                     >
                       {product.stock > 0 ? `${product.stock} in stock` : 'Out of Stock'}
@@ -295,12 +295,12 @@ export default function AdminProductsPage() {
                   <td className="py-3">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {product.isHot && (
-                        <span className="px-2 py-0.5 rounded bg-rose-600 text-white font-black text-[9px] uppercase">
+                        <span className="px-2 py-0.5 rounded bg-slate-950 text-white font-black text-[9px] uppercase">
                           HOT
                         </span>
                       )}
                       {product.badge && (
-                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold text-[9px]">
+                        <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700 font-bold text-[9px]">
                           {product.badge}
                         </span>
                       )}
@@ -309,14 +309,14 @@ export default function AdminProductsPage() {
                   <td className="py-3 text-right space-x-1.5">
                     <button
                       onClick={() => handleOpenEdit(product)}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
                       title="Edit Product"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDelete(product._id || product.slug, product.name)}
-                      className="p-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-400 hover:text-rose-200 transition-colors"
+                      className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors"
                       title="Delete Product"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -334,17 +334,17 @@ export default function AdminProductsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div
             onClick={() => setIsModalOpen(false)}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm"
           />
 
-          <div className="relative w-full max-w-2xl bg-dark-100 border border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl z-10 my-8 space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <h3 className="text-lg font-bold text-white font-display">
+          <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-2xl z-10 my-8 space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <h3 className="text-lg font-bold text-slate-950 font-display">
                 {editingProduct ? 'Edit Product' : 'Add New Product'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-slate-400 hover:text-slate-700 p-1"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -353,43 +353,43 @@ export default function AdminProductsPage() {
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="font-semibold text-slate-300">Product Name *</label>
+                  <label className="font-semibold text-slate-700">Product Name *</label>
                   <input
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-rose-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Price (৳) *</label>
+                  <label className="font-semibold text-slate-700">Price (৳) *</label>
                   <input
                     type="number"
                     required
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-rose-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Original Price (For Discount %)</label>
+                  <label className="font-semibold text-slate-700">Original Price (For Discount %)</label>
                   <input
                     type="number"
                     value={formData.originalPrice}
                     onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-rose-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Category *</label>
+                  <label className="font-semibold text-slate-700">Category *</label>
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-rose-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
                   >
                     {categories.map((c) => (
                       <option key={c._id || c.slug} value={c.slug}>
@@ -400,102 +400,102 @@ export default function AdminProductsPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Stock Quantity</label>
+                  <label className="font-semibold text-slate-700">Stock Quantity</label>
                   <input
                     type="number"
                     value={formData.stock}
                     onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-rose-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
                   />
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="font-semibold text-slate-300">Image URL</label>
+                  <label className="font-semibold text-slate-700">Image URL</label>
                   <input
                     type="text"
                     placeholder="https://images.unsplash.com/..."
                     value={formData.imageUrl}
                     onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-rose-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
                   />
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="font-semibold text-slate-300">Short Description</label>
+                  <label className="font-semibold text-slate-700">Short Description</label>
                   <input
                     type="text"
                     value={formData.shortDescription}
                     onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-rose-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
                   />
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="font-semibold text-slate-300">Detailed Description *</label>
+                  <label className="font-semibold text-slate-700">Detailed Description *</label>
                   <textarea
                     rows={3}
                     required
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-rose-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Color Variants (comma separated)</label>
+                  <label className="font-semibold text-slate-700">Color Variants (comma separated)</label>
                   <input
                     type="text"
                     placeholder="Black, Silver, Gold"
                     value={formData.colors}
                     onChange={(e) => setFormData({ ...formData, colors: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-rose-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Badge Label</label>
+                  <label className="font-semibold text-slate-700">Badge Label</label>
                   <input
                     type="text"
                     placeholder="e.g. Hot Deal, Bestseller"
                     value={formData.badge}
                     onChange={(e) => setFormData({ ...formData, badge: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-rose-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
                   />
                 </div>
 
                 <div className="sm:col-span-2 flex items-center gap-6 pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-slate-300 font-bold">
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-800 font-bold">
                     <input
                       type="checkbox"
                       checked={formData.isHot}
                       onChange={(e) => setFormData({ ...formData, isHot: e.target.checked })}
-                      className="accent-rose-500 w-4 h-4"
+                      className="accent-slate-950 w-4 h-4"
                     />
                     <span>🔥 Mark as Hot Product</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-slate-300 font-bold">
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-800 font-bold">
                     <input
                       type="checkbox"
                       checked={formData.isFeatured}
                       onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
-                      className="accent-rose-500 w-4 h-4"
+                      className="accent-slate-950 w-4 h-4"
                     />
                     <span>⭐ Mark as Featured</span>
                   </label>
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
+              <div className="pt-4 border-t border-slate-200 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs"
+                  className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-950"
+                  className="px-6 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all"
                 >
                   {editingProduct ? 'Save Changes' : 'Publish Product'}
                 </button>

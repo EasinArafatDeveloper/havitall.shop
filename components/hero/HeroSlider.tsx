@@ -95,12 +95,12 @@ export default function HeroSlider({ initialBanners }: { initialBanners?: Banner
 
   return (
     <section 
-      className="relative overflow-hidden bg-dark-200 py-4 sm:py-6"
+      className="relative overflow-hidden bg-slate-50 py-4 sm:py-6"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-slate-800/90 bg-dark-100 aspect-[16/9] sm:aspect-[21/9] md:aspect-[24/9] min-h-[220px] sm:min-h-[340px] md:min-h-[420px] select-none group">
+        <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-md border border-slate-200 bg-white aspect-[16/9] sm:aspect-[21/9] md:aspect-[24/9] min-h-[220px] sm:min-h-[340px] md:min-h-[420px] select-none group">
           
           {/* Pure Poster Slide Container with Drag & Swipe Support */}
           <AnimatePresence initial={false} custom={direction}>
@@ -136,7 +136,7 @@ export default function HeroSlider({ initialBanners }: { initialBanners?: Banner
                 />
                 
                 {/* Subtle luxury edge vignette */}
-                <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl sm:rounded-3xl pointer-events-none" />
+                <div className="absolute inset-0 ring-1 ring-inset ring-black/5 rounded-2xl sm:rounded-3xl pointer-events-none" />
               </Link>
             </motion.div>
           </AnimatePresence>
@@ -149,7 +149,7 @@ export default function HeroSlider({ initialBanners }: { initialBanners?: Banner
                 prevSlide();
               }}
               aria-label="Previous poster"
-              className="absolute left-2.5 sm:left-5 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-slate-950/70 hover:bg-rose-600 text-slate-200 hover:text-white border border-slate-700/60 backdrop-blur-md flex items-center justify-center shadow-xl transition-all duration-200 z-20 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 hover:scale-110 active:scale-95"
+              className="absolute left-2.5 sm:left-5 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-white/90 hover:bg-slate-950 text-slate-800 hover:text-white border border-slate-200 backdrop-blur-md flex items-center justify-center shadow-lg transition-all duration-200 z-20 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 hover:scale-110 active:scale-95"
             >
               <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
@@ -163,7 +163,7 @@ export default function HeroSlider({ initialBanners }: { initialBanners?: Banner
                 nextSlide();
               }}
               aria-label="Next poster"
-              className="absolute right-2.5 sm:right-5 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-slate-950/70 hover:bg-rose-600 text-slate-200 hover:text-white border border-slate-700/60 backdrop-blur-md flex items-center justify-center shadow-xl transition-all duration-200 z-20 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 hover:scale-110 active:scale-95"
+              className="absolute right-2.5 sm:right-5 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-white/90 hover:bg-slate-950 text-slate-800 hover:text-white border border-slate-200 backdrop-blur-md flex items-center justify-center shadow-lg transition-all duration-200 z-20 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 hover:scale-110 active:scale-95"
             >
               <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
@@ -171,7 +171,7 @@ export default function HeroSlider({ initialBanners }: { initialBanners?: Banner
 
           {/* Bottom Slide Indicators */}
           {banners.length > 1 && (
-            <div className="absolute bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20 bg-slate-950/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-800/80 shadow-lg">
+            <div className="absolute bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-200 shadow-md">
               {banners.map((_, idx) => (
                 <button
                   key={idx}
@@ -183,8 +183,8 @@ export default function HeroSlider({ initialBanners }: { initialBanners?: Banner
                   aria-label={`Go to poster ${idx + 1}`}
                   className={`transition-all duration-300 rounded-full h-2 ${
                     currentIndex === idx
-                      ? 'w-7 sm:w-8 bg-gradient-to-r from-rose-500 via-brand-500 to-amber-400 shadow-sm'
-                      : 'w-2 bg-slate-600 hover:bg-slate-400'
+                      ? 'w-7 sm:w-8 bg-slate-950 shadow-sm'
+                      : 'w-2 bg-slate-300 hover:bg-slate-400'
                   }`}
                 />
               ))}

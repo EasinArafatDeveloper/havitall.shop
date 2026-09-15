@@ -15,8 +15,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark scroll-smooth">
-      <body className="min-h-screen bg-dark-200 text-slate-100 antialiased selection:bg-rose-500 selection:text-white">
+    <html lang="en" className="scroll-smooth">
+      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased selection:bg-rose-600 selection:text-white">
         <ToastProvider>
           <CartProvider>
             <StoreLayoutWrapper>

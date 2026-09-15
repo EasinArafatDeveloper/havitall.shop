@@ -63,30 +63,30 @@ export default function AdminSupplierPage() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2.5 mb-1">
-          <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+          <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-950 border border-slate-200 flex items-center justify-center font-bold text-xs">
             BK
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black font-display text-white">
+          <h1 className="text-2xl sm:text-3xl font-black font-display text-slate-950">
             Business Koro Supplier & Live Sync
           </h1>
         </div>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-500">
           Connect your Business Koro Reseller API to automatically import real products, live stock, and auto-dispatch orders to suppliers.
         </p>
       </div>
 
       {/* Sync Card Form */}
-      <div className="bg-dark-100 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-200">
           <div className="flex items-center gap-2">
-            <KeyRound className="w-4 h-4 text-rose-400" />
-            <span className="text-sm font-bold text-white">API Credentials & Whitelist</span>
+            <KeyRound className="w-4 h-4 text-slate-950" />
+            <span className="text-sm font-bold text-slate-950">API Credentials & Whitelist</span>
           </div>
           <a
             href="https://businesskoro.com"
             target="_blank"
             rel="noreferrer"
-            className="text-xs text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1"
+            className="text-xs text-slate-600 hover:text-slate-950 font-semibold flex items-center gap-1"
           >
             <span>Open Business Koro</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -95,9 +95,9 @@ export default function AdminSupplierPage() {
 
         <form onSubmit={handleSync} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+            <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
               <span>Business Koro API Key *</span>
-              <span className="text-[10px] text-slate-500 font-normal">Copy from Business Koro Dashboard</span>
+              <span className="text-[10px] text-slate-400 font-normal">Copy from Business Koro Dashboard</span>
             </label>
             <div className="relative">
               <input
@@ -106,17 +106,17 @@ export default function AdminSupplierPage() {
                 placeholder="bkr_..."
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-xs text-white font-mono placeholder:text-slate-500 focus:outline-none focus:border-rose-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-xs text-slate-900 font-mono placeholder:text-slate-400 focus:outline-none focus:border-slate-950 focus:bg-white"
               />
               <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             </div>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-500">
               💡 <strong>Important:</strong> Business Koro ড্যাশবোর্ডে গিয়ে নীল <strong>"কপি"</strong> বাটনে ক্লিক করে পুরো API Key টি এখানে পেস্ট করুন।
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300">
+            <label className="text-xs font-semibold text-slate-700">
               Origin / Whitelisted Domain
             </label>
             <div className="relative">
@@ -125,7 +125,7 @@ export default function AdminSupplierPage() {
                 placeholder="https://havitall.shop"
                 value={origin}
                 onChange={(e) => setOrigin(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-rose-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-950 focus:bg-white"
               />
               <Globe className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             </div>
@@ -135,7 +135,7 @@ export default function AdminSupplierPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-brand-600 via-rose-600 to-amber-500 hover:from-brand-500 text-white font-bold text-xs shadow-lg shadow-rose-950 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+              className="px-6 py-3.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs shadow-md flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
               <span>{isLoading ? 'Testing & Syncing Products...' : 'Test Connection & Sync Real Products'}</span>
@@ -149,18 +149,18 @@ export default function AdminSupplierPage() {
         <div
           className={`rounded-3xl p-6 border transition-all ${
             result.success
-              ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
-              : 'bg-rose-950/30 border-rose-500/40 text-rose-200'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+              : 'bg-rose-50 border-rose-200 text-rose-950'
           }`}
         >
           <div className="flex items-start gap-3">
             {result.success ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             )}
             <div className="space-y-2 flex-1">
-              <h4 className="font-bold text-sm text-white">
+              <h4 className="font-bold text-sm text-slate-950">
                 {result.success ? 'Connected Successfully!' : 'API Connection Failed'}
               </h4>
               <p className="text-xs leading-relaxed">
@@ -168,9 +168,9 @@ export default function AdminSupplierPage() {
               </p>
 
               {!result.success && result.status === 401 && (
-                <div className="mt-3 p-3 bg-slate-900/80 rounded-xl border border-slate-700/60 text-xs text-slate-300 space-y-1.5">
-                  <p className="font-bold text-amber-300">কীভাবে এটি ঠিক করবেন:</p>
-                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-400">
+                <div className="mt-3 p-3 bg-white rounded-xl border border-rose-200 text-xs text-slate-700 space-y-1.5 shadow-sm">
+                  <p className="font-bold text-amber-700">কীভাবে এটি ঠিক করবেন:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-600">
                     <li>Business Koro ড্যাশবোর্ডে গিয়ে <strong>API Key</strong> বক্সের পাশের নীল <strong>"কপি"</strong> বাটনে ক্লিক করুন।</li>
                     <li>যদি কী রি-জেনারেট করে থাকেন, তবে নতুন কপি করা কী-টি উপরের বক্সে পেস্ট করে <strong>"Test Connection & Sync Real Products"</strong>-এ ক্লিক করুন।</li>
                     <li>হোয়াইটলিস্ট অপশনে <code>havitall.shop</code> লিখে <strong>"সেভ করুন"</strong> বাটন ক্লিক করেছেন কিনা নিশ্চিত করুন।</li>
@@ -179,7 +179,7 @@ export default function AdminSupplierPage() {
               )}
 
               {result.success && result.count > 0 && (
-                <div className="mt-2 text-xs text-emerald-300 font-semibold flex items-center gap-1.5">
+                <div className="mt-2 text-xs text-emerald-700 font-semibold flex items-center gap-1.5">
                   <ShoppingBag className="w-4 h-4" />
                   <span>{result.count} real products are now live on your website!</span>
                 </div>
@@ -190,9 +190,9 @@ export default function AdminSupplierPage() {
       )}
 
       {/* Guide Card */}
-      <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 text-xs text-slate-400 space-y-3">
-        <h4 className="font-bold text-white uppercase tracking-wider flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400" />
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 text-xs text-slate-600 space-y-3 shadow-sm">
+        <h4 className="font-bold text-slate-950 uppercase tracking-wider flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-slate-950" />
           How Business Koro Real Sync Works
         </h4>
         <ul className="space-y-2 leading-relaxed">

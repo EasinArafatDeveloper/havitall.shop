@@ -117,36 +117,36 @@ function ShopContent() {
   };
 
   return (
-    <div className="bg-dark-200 min-h-screen py-8 sm:py-12">
+    <div className="bg-slate-50 min-h-screen py-8 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Breadcrumb & Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+          <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
             <span>Home</span>
             <span>/</span>
-            <span className="text-white font-semibold">Shop Catalog</span>
+            <span className="text-slate-950 font-semibold">Shop Catalog</span>
             {selectedCategory !== 'all' && (
               <>
                 <span>/</span>
-                <span className="text-rose-400 font-semibold capitalize">{selectedCategory.replace('-', ' ')}</span>
+                <span className="text-slate-950 font-semibold capitalize">{selectedCategory.replace('-', ' ')}</span>
               </>
             )}
           </div>
-          <h1 className="text-2xl sm:text-4xl font-black font-display text-white">
+          <h1 className="text-2xl sm:text-4xl font-black font-display text-slate-950">
             {selectedCategory !== 'all' ? (
               <span className="capitalize">{selectedCategory.replace('-', ' ')} Collection</span>
             ) : (
-              <span>All Luxury <span className="text-gradient-brand">Products</span></span>
+              <span>All Products & <span className="text-slate-600 font-serif italic font-normal">Catalog</span></span>
             )}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Showing {filteredProducts.length} items matching your curated criteria
           </p>
         </div>
 
         {/* Toolbar: Search, Filter Toggle, Sort */}
-        <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-dark-100 border border-slate-800 mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200 mb-8 shadow-sm">
           {/* Search */}
           <div className="relative flex-1 min-w-[240px] max-w-md">
             <input
@@ -154,13 +154,13 @@ function ShopContent() {
               placeholder="Search products, keywords, tags..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700/80 rounded-xl py-2 pl-10 pr-4 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-rose-500"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-950"
             />
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -171,19 +171,19 @@ function ShopContent() {
             {/* Mobile Filter Button */}
             <button
               onClick={() => setIsMobileFilterOpen(true)}
-              className="lg:hidden flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200"
+              className="lg:hidden flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-800"
             >
-              <Filter className="w-4 h-4 text-rose-400" />
+              <Filter className="w-4 h-4 text-slate-950" />
               <span>Filters</span>
             </button>
 
             {/* Sort Dropdown */}
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-400 hidden sm:inline">Sort:</span>
+              <span className="text-xs font-semibold text-slate-500 hidden sm:inline">Sort:</span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-rose-500"
+                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:border-slate-950"
               >
                 <option value="newest">Newest Arrivals</option>
                 <option value="price-low">Price: Low to High</option>
@@ -198,14 +198,14 @@ function ShopContent() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
           
           {/* Desktop Filter Sidebar */}
-          <aside className="hidden lg:block space-y-6 p-6 rounded-2xl bg-dark-100 border border-slate-800 sticky top-24">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <span className="text-sm font-black uppercase tracking-wider text-white flex items-center gap-2">
-                <SlidersHorizontal className="w-4 h-4 text-rose-400" /> Filters
+          <aside className="hidden lg:block space-y-6 p-6 rounded-2xl bg-white border border-slate-200 sticky top-24 shadow-sm">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <span className="text-sm font-black uppercase tracking-wider text-slate-950 flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-slate-950" /> Filters
               </span>
               <button
                 onClick={resetFilters}
-                className="text-[11px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1"
+                className="text-[11px] text-slate-600 hover:text-slate-950 font-semibold flex items-center gap-1"
               >
                 <RotateCcw className="w-3 h-3" /> Reset
               </button>
@@ -213,7 +213,7 @@ function ShopContent() {
 
             {/* Category Filter */}
             <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                 Categories
               </h4>
               <div className="space-y-1">
@@ -221,12 +221,12 @@ function ShopContent() {
                   onClick={() => setSelectedCategory('all')}
                   className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center justify-between ${
                     selectedCategory === 'all'
-                      ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                      ? 'bg-slate-950 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100'
                   }`}
                 >
                   <span>All Categories</span>
-                  <span className="text-[10px] text-slate-500">{products.length}</span>
+                  <span className="text-[10px] opacity-70">{products.length}</span>
                 </button>
                 {categories.map((cat) => {
                   const count = products.filter((p) => p.category === cat.slug).length;
@@ -236,12 +236,12 @@ function ShopContent() {
                       onClick={() => setSelectedCategory(cat.slug)}
                       className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center justify-between ${
                         selectedCategory === cat.slug
-                          ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                          ? 'bg-slate-950 text-white shadow-sm'
+                          : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100'
                       }`}
                     >
                       <span className="truncate">{cat.name}</span>
-                      <span className="text-[10px] text-slate-500">{count}</span>
+                      <span className="text-[10px] opacity-70">{count}</span>
                     </button>
                   );
                 })}
@@ -249,12 +249,12 @@ function ShopContent() {
             </div>
 
             {/* Price Filter Slider */}
-            <div className="space-y-3 pt-4 border-t border-slate-800">
+            <div className="space-y-3 pt-4 border-t border-slate-100">
               <div className="flex items-center justify-between text-xs">
-                <h4 className="font-bold uppercase tracking-wider text-slate-300">
+                <h4 className="font-bold uppercase tracking-wider text-slate-700">
                   Max Price
                 </h4>
-                <span className="font-black text-rose-400 font-display">৳{maxPrice.toLocaleString()}</span>
+                <span className="font-black text-slate-950 font-display">৳{maxPrice.toLocaleString()}</span>
               </div>
               <input
                 type="range"
@@ -263,7 +263,7 @@ function ShopContent() {
                 step="250"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(Number(e.target.value))}
-                className="w-full accent-rose-500 bg-slate-800 h-2 rounded-lg cursor-pointer"
+                className="w-full accent-slate-950 bg-slate-200 h-2 rounded-lg cursor-pointer"
               />
               <div className="flex justify-between text-[11px] text-slate-500">
                 <span>৳500</span>
@@ -272,16 +272,16 @@ function ShopContent() {
             </div>
 
             {/* Hot Deals Toggle */}
-            <div className="pt-4 border-t border-slate-800">
+            <div className="pt-4 border-t border-slate-100">
               <label className="flex items-center gap-3 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={onlyHot}
                   onChange={(e) => setOnlyHot(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-rose-600 focus:ring-rose-500 accent-rose-500"
+                  className="w-4 h-4 rounded border-slate-300 text-slate-950 focus:ring-slate-950 accent-slate-950"
                 />
-                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Flame className="w-3.5 h-3.5 text-rose-500" /> Hot & Trending Only
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Flame className="w-3.5 h-3.5 text-rose-600" /> Hot & Trending Only
                 </span>
               </label>
             </div>
@@ -292,21 +292,21 @@ function ShopContent() {
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="h-80 rounded-2xl bg-slate-800/50 border border-slate-700/50" />
+                  <div key={i} className="h-80 rounded-2xl bg-white border border-slate-200 shadow-sm" />
                 ))}
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="p-12 text-center rounded-3xl bg-dark-100 border border-slate-800 space-y-4">
-                <div className="w-16 h-16 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500">
+              <div className="p-12 text-center rounded-3xl bg-white border border-slate-200 space-y-4 shadow-sm">
+                <div className="w-16 h-16 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
                   <Search className="w-8 h-8" />
                 </div>
-                <h3 className="text-lg font-bold text-white">No products found</h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                <h3 className="text-lg font-bold text-slate-900">No products found</h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
                   We couldn't find any products matching your active filters. Try adjusting your search or price range.
                 </p>
                 <button
                   onClick={resetFilters}
-                  className="px-6 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all"
+                  className="px-6 py-2.5 bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-md transition-all"
                 >
                   Clear All Filters
                 </button>
@@ -340,8 +340,8 @@ function ShopContent() {
 export default function ShopPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-dark-200">
-        <div className="w-8 h-8 border-4 border-rose-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <ShopContent />
