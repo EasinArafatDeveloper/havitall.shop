@@ -10,34 +10,59 @@ import Product from '@/lib/models/Product';
 import Category from '@/lib/models/Category';
 import Banner from '@/lib/models/Banner';
 
+import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 async function getData() {
+  let products: any[] = [];
+  let categories: any[] = [];
+  let banners: any[] = [];
+
+  // 1. Fetch live products from Business Koro
+  const bkProducts = await fetchBusinessKoroProducts();
+  if (bkProducts && bkProducts.length > 0) {
+    products.push(...bkProducts);
+  }
+
+  // 2. Fetch local products and banners from MongoDB
   try {
     const db = await connectToDatabase();
     if (db) {
-      const products = await Product.find().sort({ createdAt: -1 }).lean();
-      const categories = await Category.find().lean();
-      const banners = await Banner.find({ isActive: true }).sort({ order: 1 }).lean();
+      const localProducts = await Product.find().sort({ createdAt: -1 }).lean();
+      const localCategories = await Category.find().lean();
+      const localBanners = await Banner.find({ isActive: true }).sort({ order: 1 }).lean();
 
-      if (products && products.length > 0) {
-        return {
-          products: JSON.parse(JSON.stringify(products)),
-          categories: JSON.parse(JSON.stringify(categories)),
-          banners: JSON.parse(JSON.stringify(banners)),
-        };
+      if (localProducts && localProducts.length > 0) {
+        products.push(...JSON.parse(JSON.stringify(localProducts)));
+      }
+      if (localCategories && localCategories.length > 0) {
+        categories = JSON.parse(JSON.stringify(localCategories));
+      }
+      if (localBanners && localBanners.length > 0) {
+        banners = JSON.parse(JSON.stringify(localBanners));
       }
     }
   } catch (e) {
     console.error('Database query in page.tsx:', e);
   }
 
-  // Fallback to memory store or seedData
+  // Fallback to memory store or seedData if empty
+  if (products.length === 0) {
+    products = memoryStore?.products || initialProducts;
+  }
+  if (categories.length === 0) {
+    categories = memoryStore?.categories || initialCategories;
+  }
+  if (banners.length === 0) {
+    banners = memoryStore?.banners || initialBanners;
+  }
+
   return {
-    products: memoryStore?.products || initialProducts,
-    categories: memoryStore?.categories || initialCategories,
-    banners: memoryStore?.banners || initialBanners,
+    products,
+    categories,
+    banners,
   };
 }
 

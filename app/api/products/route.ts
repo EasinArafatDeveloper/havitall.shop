@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Product from '@/lib/models/Product';
 import { memoryStore } from '@/lib/memoryStore';
+import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
 
 export async function GET(request: Request) {
   try {
@@ -13,34 +14,36 @@ export async function GET(request: Request) {
     const sort = searchParams.get('sort') || 'newest';
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    const db = await connectToDatabase();
-    if (db) {
-      const query: any = {};
-      if (category && category !== 'all') query.category = category;
-      if (isHot === 'true') query.isHot = true;
-      if (isFeatured === 'true') query.isFeatured = true;
-      if (search) {
-        query.$or = [
-          { name: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } },
-          { tags: { $in: [new RegExp(search, 'i')] } },
-        ];
-      }
+    let allProducts: any[] = [];
 
-      let sortOption: any = { createdAt: -1 };
-      if (sort === 'price-low') sortOption = { price: 1 };
-      if (sort === 'price-high') sortOption = { price: -1 };
-      if (sort === 'rating') sortOption = { rating: -1 };
-
-      const products = await Product.find(query).sort(sortOption).limit(limit).lean();
-      if (products && products.length > 0) {
-        return NextResponse.json({ success: true, products, count: products.length, source: 'mongodb' });
-      }
+    // 1. Fetch live products from Business Koro API
+    const bkProducts = await fetchBusinessKoroProducts();
+    if (bkProducts && bkProducts.length > 0) {
+      allProducts.push(...bkProducts);
     }
 
-    // Memory store fallback
-    let filtered = [...(memoryStore?.products || [])];
-    if (category && category !== 'all') {
+    // 2. Fetch locally added products from MongoDB
+    try {
+      const db = await connectToDatabase();
+      if (db) {
+        const localProducts = await Product.find().sort({ createdAt: -1 }).lean();
+        if (localProducts && localProducts.length > 0) {
+          allProducts.push(...localProducts);
+        }
+      }
+    } catch (e) {
+      console.warn('MongoDB query fallback in products API:', e);
+    }
+
+    // 3. Fallback to memory store if no products found yet
+    if (allProducts.length === 0) {
+      allProducts = [...(memoryStore?.products || [])];
+    }
+
+    // Apply filtering
+    let filtered = [...allProducts];
+
+    if (category && category !== 'all' && category !== 'all-collection') {
       filtered = filtered.filter((p) => p.category === category);
     }
     if (isHot === 'true') {
@@ -53,12 +56,13 @@ export async function GET(request: Request) {
       const s = search.toLowerCase();
       filtered = filtered.filter(
         (p) =>
-          p.name.toLowerCase().includes(s) ||
+          p.name?.toLowerCase().includes(s) ||
           p.description?.toLowerCase().includes(s) ||
           p.tags?.some((t: string) => t.toLowerCase().includes(s))
       );
     }
 
+    // Apply sorting
     if (sort === 'price-low') filtered.sort((a, b) => a.price - b.price);
     else if (sort === 'price-high') filtered.sort((a, b) => b.price - a.price);
     else if (sort === 'rating') filtered.sort((a, b) => b.rating - a.rating);
@@ -68,7 +72,7 @@ export async function GET(request: Request) {
       success: true,
       products: filtered.slice(0, limit),
       count: filtered.length,
-      source: 'memory',
+      source: bkProducts && bkProducts.length > 0 ? 'businesskoro' : 'local',
     });
   } catch (error: any) {
     console.error('Error fetching products:', error);

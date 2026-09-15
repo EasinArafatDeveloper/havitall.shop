@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Product from '@/lib/models/Product';
 import { memoryStore } from '@/lib/memoryStore';
+import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
 
 export async function GET(
   request: Request,
@@ -9,8 +10,18 @@ export async function GET(
 ) {
   try {
     const { id } = params;
-    const db = await connectToDatabase();
 
+    // 1. Try Business Koro live products
+    const bkProducts = await fetchBusinessKoroProducts();
+    if (bkProducts && bkProducts.length > 0) {
+      const found = bkProducts.find((p: any) => p._id === id || p.slug === id || p.businessKoroId === id);
+      if (found) {
+        return NextResponse.json({ success: true, product: found, source: 'businesskoro' });
+      }
+    }
+
+    // 2. Try MongoDB
+    const db = await connectToDatabase();
     if (db) {
       let product = null;
       if (id.match(/^[0-9a-fA-F]{24}$/)) {
@@ -24,7 +35,7 @@ export async function GET(
       }
     }
 
-    // Memory store fallback
+    // 3. Memory store fallback
     const memProduct = memoryStore?.products.find(
       (p) => p._id === id || p.slug === id
     );

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Order from '@/lib/models/Order';
 import { memoryStore } from '@/lib/memoryStore';
+import { pushOrderToBusinessKoro } from '@/lib/businessKoro';
 
 export async function GET() {
   try {
@@ -73,6 +74,22 @@ export async function POST(request: Request) {
         },
       ],
     };
+
+    // Forward order to Business Koro Reseller Supplier Fulfillment in background
+    for (const item of items) {
+      pushOrderToBusinessKoro({
+        productId: String(item.productId || item.id || item.businessKoroId || '1'),
+        customerName: customer.fullName,
+        customerPhone: customer.phone,
+        customerAddress: customer.address,
+        customerDivision: customer.city || 'Dhaka',
+        customerDistrict: customer.city || 'Dhaka',
+        customerArea: customer.city || 'Dhaka',
+        sellingPrice: Number(item.price || totalAmount),
+        deliveryChargePaidByCustomer: true,
+        customerNote: customer.note || `HavItAll Order ${orderNumber}`,
+      }).catch((err) => console.warn('Business Koro push warning:', err));
+    }
 
     const db = await connectToDatabase();
     if (db) {
