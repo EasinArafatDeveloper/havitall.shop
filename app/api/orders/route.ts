@@ -221,7 +221,8 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
-    if (!id) {
+    const cleanId = String(id || '').trim();
+    if (!cleanId) {
       return NextResponse.json({ success: false, error: 'Order ID is required' }, { status: 400 });
     }
 
@@ -230,10 +231,11 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: 'Database service unavailable' }, { status: 503 });
     }
 
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      await Order.findByIdAndDelete(id);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(cleanId);
+    if (isObjectId) {
+      await Order.findOneAndDelete({ $or: [{ _id: cleanId }, { orderNumber: cleanId.toUpperCase() }] });
     } else {
-      await Order.findOneAndDelete({ $or: [{ orderNumber: id.toUpperCase() }, { _id: id }] });
+      await Order.findOneAndDelete({ orderNumber: cleanId.toUpperCase() });
     }
 
     return NextResponse.json({ success: true, message: 'Order deleted successfully' });
