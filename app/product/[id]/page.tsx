@@ -20,6 +20,7 @@ import {
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
 import ProductCard from '@/components/products/ProductCard';
+import { trackViewContent } from '@/lib/fbpixel';
 
 export default function ProductDetailPage() {
   const router = useRouter();
@@ -45,6 +46,11 @@ export default function ProductDetailPage() {
         const data = await res.json();
         if (data.success && data.product) {
           setProduct(data.product);
+          trackViewContent({
+            id: data.product._id || data.product.slug,
+            name: data.product.name,
+            price: Number(data.product.offerPrice || data.product.price),
+          });
           if (data.product.variants?.colors?.[0]) {
             setSelectedColor(data.product.variants.colors[0]);
           }
@@ -280,30 +286,55 @@ export default function ProductDetailPage() {
 
             {/* Quantity and Actions */}
             <div className="space-y-4 pt-4 border-t border-slate-200">
-              <div className="flex flex-wrap items-center gap-4">
-                {/* Quantity */}
-                <div className="flex items-center border border-slate-200 bg-white rounded-xl">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="px-4 py-3 text-slate-600 hover:text-slate-950 font-bold"
-                  >
-                    -
-                  </button>
-                  <span className="px-4 text-sm font-bold text-slate-950 min-w-[36px] text-center">
-                    {quantity}
-                  </span>
-                  <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="px-4 py-3 text-slate-600 hover:text-slate-950 font-bold"
-                  >
-                    +
-                  </button>
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4">
+                <div className="flex items-center justify-between sm:justify-start gap-3">
+                  {/* Quantity */}
+                  <div className="flex items-center justify-center border border-slate-200 bg-white rounded-xl shrink-0">
+                    <button
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="px-4 py-3 text-slate-600 hover:text-slate-950 font-bold"
+                    >
+                      -
+                    </button>
+                    <span className="px-4 text-sm font-bold text-slate-950 min-w-[36px] text-center">
+                      {quantity}
+                    </span>
+                    <button
+                      onClick={() => setQuantity(quantity + 1)}
+                      className="px-4 py-3 text-slate-600 hover:text-slate-950 font-bold"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Wishlist & Share (grouped next to quantity on mobile) */}
+                  <div className="flex items-center gap-3 sm:hidden">
+                    <button
+                      onClick={() => toggleWishlist(product._id || product.id || product.slug)}
+                      className={`p-3.5 rounded-xl border transition-colors ${
+                        inWishlist
+                          ? 'bg-rose-50 border-rose-200 text-rose-600'
+                          : 'bg-white border-slate-200 text-slate-600 hover:text-slate-950'
+                      }`}
+                      aria-label="Wishlist"
+                    >
+                      <Heart className={`w-5 h-5 ${inWishlist ? 'fill-rose-600 text-rose-600' : ''}`} />
+                    </button>
+
+                    <button
+                      onClick={handleShare}
+                      className="p-3.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-950 transition-colors"
+                      aria-label="Share product"
+                    >
+                      <Share2 className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Add to Cart */}
                 <button
                   onClick={handleAddToCart}
-                  className="flex-1 py-3.5 px-6 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-950 font-bold text-sm border border-slate-200 shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+                  className="w-full sm:flex-1 py-3.5 px-6 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-950 font-bold text-sm border border-slate-200 shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95"
                 >
                   <ShoppingBag className="w-4 h-4 text-slate-950" />
                   <span>Add to Cart</span>
@@ -312,33 +343,34 @@ export default function ProductDetailPage() {
                 {/* Buy Now */}
                 <button
                   onClick={handleBuyNow}
-                  className="flex-1 py-3.5 px-6 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all active:scale-95"
+                  className="w-full sm:flex-1 py-3.5 px-6 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all active:scale-95"
                 >
                   <Zap className="w-4 h-4" />
                   <span>Buy Now</span>
                 </button>
 
-                {/* Wishlist */}
-                <button
-                  onClick={() => toggleWishlist(product._id || product.id || product.slug)}
-                  className={`p-3.5 rounded-xl border transition-colors ${
-                    inWishlist
-                      ? 'bg-rose-50 border-rose-200 text-rose-600'
-                      : 'bg-white border-slate-200 text-slate-600 hover:text-slate-950'
-                  }`}
-                  aria-label="Wishlist"
-                >
-                  <Heart className={`w-5 h-5 ${inWishlist ? 'fill-rose-600 text-rose-600' : ''}`} />
-                </button>
+                {/* Wishlist & Share (inline on tablet/desktop) */}
+                <div className="hidden sm:flex items-center gap-3">
+                  <button
+                    onClick={() => toggleWishlist(product._id || product.id || product.slug)}
+                    className={`p-3.5 rounded-xl border transition-colors ${
+                      inWishlist
+                        ? 'bg-rose-50 border-rose-200 text-rose-600'
+                        : 'bg-white border-slate-200 text-slate-600 hover:text-slate-950'
+                    }`}
+                    aria-label="Wishlist"
+                  >
+                    <Heart className={`w-5 h-5 ${inWishlist ? 'fill-rose-600 text-rose-600' : ''}`} />
+                  </button>
 
-                {/* Share */}
-                <button
-                  onClick={handleShare}
-                  className="p-3.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-950 transition-colors"
-                  aria-label="Share product"
-                >
-                  <Share2 className="w-5 h-5" />
-                </button>
+                  <button
+                    onClick={handleShare}
+                    className="p-3.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-950 transition-colors"
+                    aria-label="Share product"
+                  >
+                    <Share2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Trust highlights */}

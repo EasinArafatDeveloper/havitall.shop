@@ -4,20 +4,24 @@
  * Headers: x-api-key, Origin
  */
 
-const API_KEY = process.env.BUSINESS_KORO_API_KEY || 'bkr_5c498792bc7a89dbc6c1426c141ef8c8a581bd577865feb0';
+const API_KEY = process.env.BUSINESS_KORO_API_KEY || '';
 const BASE_URL = process.env.BUSINESS_KORO_BASE_URL || 'https://api.businesskoro.com/api/v1/storefront';
 const ORIGIN_HEADER = process.env.BUSINESS_KORO_ORIGIN || 'https://havitall.shop';
 
 export interface BusinessKoroRawProduct {
-  id: string;
+  id?: string;
+  _id?: string;
+  productId?: string;
+  code?: string;
   name: string;
+  slug?: string;
   description?: string;
   images?: string[];
   suggestedPrice?: number;
   price?: number;
   inStock?: boolean;
   category?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface BusinessKoroOrderPayload {
@@ -41,7 +45,7 @@ export function formatBusinessKoroProduct(item: BusinessKoroRawProduct, index: n
   const originalPrice = Math.round(price * 1.25);
   const discountPercentage = Math.round(((originalPrice - price) / originalPrice) * 100);
 
-  const rawId = String(item.id || item._id || item.productId || item.code || (index + 1));
+  const rawId = String(item.id || item._id || item.productId || item.code || `bk_${index + 1}`);
 
   // Generate deterministic URL slug using item name and rawId
   const slug = item.slug || (item.name
@@ -119,12 +123,16 @@ export function formatBusinessKoroProduct(item: BusinessKoroRawProduct, index: n
  * Fetch live products from Business Koro API
  */
 export async function fetchBusinessKoroProducts() {
+  if (!API_KEY) {
+    return null;
+  }
+
   try {
     const res = await fetch(`${BASE_URL}/products`, {
       method: 'GET',
       headers: {
-        'x-api-key': API_KEY,
-        'Origin': ORIGIN_HEADER,
+        'x-api-key': API_KEY.trim(),
+        'Origin': ORIGIN_HEADER.trim(),
         'Content-Type': 'application/json',
       },
       next: { revalidate: 60 }, // Cache for 60 seconds
@@ -138,15 +146,16 @@ export async function fetchBusinessKoroProducts() {
     const json = await res.json();
     const rawList = Array.isArray(json) 
       ? json 
-      : json.data || json.products || json.result || [];
+      : json?.data || json?.products || json?.result || [];
 
     if (Array.isArray(rawList) && rawList.length > 0) {
-      return rawList.map((item: any, i: number) => formatBusinessKoroProduct(item, i));
+      return rawList.map((item: BusinessKoroRawProduct, i: number) => formatBusinessKoroProduct(item, i));
     }
 
     return [];
-  } catch (error: any) {
-    console.error('Error fetching products from Business Koro API:', error.message);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error fetching products from Business Koro API:', err.message);
     return null;
   }
 }
@@ -155,30 +164,33 @@ export async function fetchBusinessKoroProducts() {
  * Push an order placed on HavItAll to Business Koro for automated fulfillment
  */
 export async function pushOrderToBusinessKoro(orderData: BusinessKoroOrderPayload) {
+  if (!API_KEY) {
+    return { success: false, error: 'API key not configured' };
+  }
+
   try {
-    console.log('Pushing order to Business Koro:', orderData);
     const res = await fetch(`${BASE_URL}/orders`, {
       method: 'POST',
       headers: {
-        'x-api-key': API_KEY,
-        'Origin': ORIGIN_HEADER,
+        'x-api-key': API_KEY.trim(),
+        'Origin': ORIGIN_HEADER.trim(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(orderData),
     });
 
-    const json = await res.json();
-    console.log('Business Koro order placement response:', json);
+    const json = await res.json().catch(() => null);
     return {
       success: res.ok,
       status: res.status,
       data: json,
     };
-  } catch (error: any) {
-    console.error('Error pushing order to Business Koro:', error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error pushing order to Business Koro:', err.message);
     return {
       success: false,
-      error: error.message,
+      error: err.message,
     };
   }
 }
@@ -187,20 +199,23 @@ export async function pushOrderToBusinessKoro(orderData: BusinessKoroOrderPayloa
  * Fetch real-time order tracking status from Business Koro
  */
 export async function getBusinessKoroOrderStatus(orderId: string) {
+  if (!API_KEY || !orderId) return null;
+
   try {
-    const res = await fetch(`${BASE_URL}/orders/${orderId}`, {
+    const res = await fetch(`${BASE_URL}/orders/${encodeURIComponent(orderId)}`, {
       method: 'GET',
       headers: {
-        'x-api-key': API_KEY,
-        'Origin': ORIGIN_HEADER,
+        'x-api-key': API_KEY.trim(),
+        'Origin': ORIGIN_HEADER.trim(),
         'Content-Type': 'application/json',
       },
     });
 
     if (!res.ok) return null;
-    return await res.json();
-  } catch (error: any) {
-    console.error('Error fetching order status from Business Koro:', error);
+    return await res.json().catch(() => null);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error fetching order status from Business Koro:', err.message);
     return null;
   }
 }

@@ -20,37 +20,17 @@ export default function HeroSlider({ initialBanners }: { initialBanners?: Banner
   const [direction, setDirection] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 
-  // Fetch latest banners from API & sync with localStorage
+  // Fetch latest banners directly from database API
   useEffect(() => {
     async function loadBanners() {
       try {
         const res = await fetch('/api/banners');
         const data = await res.json();
-        if (data.success && data.banners && data.banners.length > 0) {
+        if (data.success && Array.isArray(data.banners) && data.banners.length > 0) {
           setBanners(data.banners);
-          try {
-            localStorage.setItem('havitall_hero_banners', JSON.stringify(data.banners));
-          } catch (e) {}
-        } else {
-          // If server returned empty, check client storage
-          try {
-            const cachedStr = localStorage.getItem('havitall_hero_banners');
-            if (cachedStr) {
-              const cached = JSON.parse(cachedStr);
-              if (Array.isArray(cached) && cached.length > 0) {
-                setBanners(cached);
-              }
-            }
-          } catch (e) {}
         }
       } catch (err) {
-        console.error('Failed to load hero banners:', err);
-        try {
-          const cachedStr = localStorage.getItem('havitall_hero_banners');
-          if (cachedStr) {
-            setBanners(JSON.parse(cachedStr));
-          }
-        } catch (e) {}
+        console.warn('Could not refresh hero banners from API:', err);
       }
     }
     loadBanners();

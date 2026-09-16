@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document, models, model } from 'mongoose';
 
 export interface IProduct extends Document {
+  businessKoroId?: string;
   name: string;
   slug: string;
   description: string;
@@ -16,6 +17,7 @@ export interface IProduct extends Document {
   isHot?: boolean;
   isFeatured?: boolean;
   isNewArrival?: boolean;
+  isDeleted?: boolean;
   badge?: string;
   variants?: {
     colors?: string[];
@@ -23,14 +25,16 @@ export interface IProduct extends Document {
   };
   features?: string[];
   tags?: string[];
+  source?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const ProductSchema = new Schema<IProduct>(
   {
+    businessKoroId: { type: String, index: true, sparse: true },
     name: { type: String, required: true, trim: true },
-    slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    slug: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     description: { type: String, required: true },
     shortDescription: { type: String },
     price: { type: Number, required: true, min: 0 },
@@ -41,9 +45,10 @@ const ProductSchema = new Schema<IProduct>(
     stock: { type: Number, required: true, default: 10, min: 0 },
     rating: { type: Number, default: 4.8, min: 0, max: 5 },
     numReviews: { type: Number, default: 12 },
-    isHot: { type: Boolean, default: false },
-    isFeatured: { type: Boolean, default: false },
+    isHot: { type: Boolean, default: false, index: true },
+    isFeatured: { type: Boolean, default: false, index: true },
     isNewArrival: { type: Boolean, default: true },
+    isDeleted: { type: Boolean, default: false, index: true },
     badge: { type: String },
     variants: {
       colors: { type: [String], default: [] },
@@ -51,6 +56,7 @@ const ProductSchema = new Schema<IProduct>(
     },
     features: { type: [String], default: [] },
     tags: { type: [String], default: [] },
+    source: { type: String, default: 'local' },
   },
   {
     timestamps: true,

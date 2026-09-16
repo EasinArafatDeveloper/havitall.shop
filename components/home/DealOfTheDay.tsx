@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Timer, ArrowRight, Sparkles, Copy, Check, Flame, ShoppingBag } from 'lucide-react';
-import { useToast } from '@/context/ToastContext';
+import { Timer, ArrowRight, Sparkles, Flame, ShoppingBag, Zap, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 
 interface OfferItem {
@@ -12,15 +11,18 @@ interface OfferItem {
   productName: string;
   productImage: string;
   productSlug: string;
+  posterImage?: string;
   originalPrice: number;
   offerPrice: number;
   discountPercentage: number;
   title: string;
   subtitle?: string;
   badgeText: string;
-  couponCode: string;
+  buttonText?: string;
+  couponCode?: string;
   endDate: string;
   isActive: boolean;
+  showAsPopup?: boolean;
 }
 
 interface DealOfTheDayProps {
@@ -28,18 +30,18 @@ interface DealOfTheDayProps {
 }
 
 export default function DealOfTheDay({ initialOffers }: DealOfTheDayProps) {
-  const { success } = useToast();
   const { addToCart } = useCart();
   const [offers, setOffers] = useState<OfferItem[]>(initialOffers || []);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
-  // Timers for offer 0 and offer 1
-  const [timeRemaining, setTimeRemaining] = useState<{ [key: string]: { hours: number; minutes: number; seconds: number } }>({});
+  // Countdown timers per offer ID
+  const [timeRemaining, setTimeRemaining] = useState<{
+    [key: string]: { hours: number; minutes: number; seconds: number };
+  }>({});
 
   useEffect(() => {
     async function fetchOffers() {
       try {
-        const res = await fetch('/api/offers?activeOnly=true');
+        const res = await fetch('/api/offers?dealOnly=true');
         const data = await res.json();
         if (data.success && data.offers) {
           setOffers(data.offers.slice(0, 2));
@@ -57,7 +59,7 @@ export default function DealOfTheDay({ initialOffers }: DealOfTheDayProps) {
   useEffect(() => {
     const updateCountdown = () => {
       const newTimers: { [key: string]: { hours: number; minutes: number; seconds: number } } = {};
-      
+
       offers.forEach((offer, idx) => {
         const end = offer.endDate ? new Date(offer.endDate).getTime() : Date.now() + 86400000;
         const diff = Math.max(0, end - Date.now());
@@ -77,13 +79,6 @@ export default function DealOfTheDay({ initialOffers }: DealOfTheDayProps) {
     return () => clearInterval(interval);
   }, [offers]);
 
-  const handleCopy = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    success(`Coupon code "${code}" copied to clipboard!`);
-    setTimeout(() => setCopiedCode(null), 2500);
-  };
-
   const handleAddToCart = (offer: OfferItem) => {
     const prod = {
       _id: offer.productId,
@@ -91,7 +86,7 @@ export default function DealOfTheDay({ initialOffers }: DealOfTheDayProps) {
       slug: offer.productSlug,
       price: offer.offerPrice,
       originalPrice: offer.originalPrice,
-      images: [offer.productImage],
+      images: [offer.productImage || offer.posterImage || ''],
       stock: 15,
       isOffer: true,
       offerBadge: offer.badgeText || '🔥 Flash Deal',
@@ -103,265 +98,283 @@ export default function DealOfTheDay({ initialOffers }: DealOfTheDayProps) {
     return null;
   }
 
-  // If 1 Active Offer: Full-width Hero Offer Card
-  if (offers.length === 1) {
-    const offer = offers[0];
-    const timer = timeRemaining[offer._id || 'offer_0'] || { hours: 24, minutes: 0, seconds: 0 };
-    const savings = offer.originalPrice > offer.offerPrice ? offer.originalPrice - offer.offerPrice : 0;
-
-    return (
-      <section className="py-12 sm:py-16 bg-white relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative rounded-3xl overflow-hidden border border-slate-900 p-8 sm:p-12 lg:p-16 bg-slate-950 text-white shadow-2xl">
-            {/* Subtle Glow Background */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
-              {/* Left Info */}
-              <div className="lg:col-span-7 space-y-6">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold uppercase tracking-wider">
-                  <Flame className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{offer.badgeText || 'LIMITED FLASH DEAL'}</span>
-                </div>
-
-                <h2 className="text-3xl sm:text-4xl md:text-5xl font-black font-display text-white tracking-tight leading-tight">
-                  {offer.title}
-                </h2>
-
-                <p className="text-sm sm:text-base text-slate-300 max-w-lg">
-                  {offer.subtitle || `Exclusive flash discount on ${offer.productName}. Claim your premium deal before countdown runs out.`}
-                </p>
-
-                {/* Price Display */}
-                <div className="flex items-baseline gap-3 pt-1">
-                  <span className="text-3xl sm:text-4xl font-black text-white font-display">
-                    ৳{offer.offerPrice.toLocaleString()}
-                  </span>
-                  {offer.originalPrice > offer.offerPrice && (
-                    <>
-                      <span className="text-lg text-slate-400 line-through">
-                        ৳{offer.originalPrice.toLocaleString()}
-                      </span>
-                      <span className="px-3 py-1 rounded-xl bg-amber-400 text-slate-950 text-xs font-black uppercase">
-                        {offer.discountPercentage}% OFF
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {/* Countdown Timer Boxes */}
-                <div className="flex items-center gap-3 pt-2">
-                  <div className="flex flex-col items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/10 border border-white/15 shadow-inner backdrop-blur-sm">
-                    <span className="text-xl sm:text-2xl font-black text-white font-display">
-                      {String(timer.hours).padStart(2, '0')}
-                    </span>
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Hours</span>
-                  </div>
-                  <span className="text-xl font-black text-slate-400">:</span>
-                  <div className="flex flex-col items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/10 border border-white/15 shadow-inner backdrop-blur-sm">
-                    <span className="text-xl sm:text-2xl font-black text-white font-display">
-                      {String(timer.minutes).padStart(2, '0')}
-                    </span>
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Mins</span>
-                  </div>
-                  <span className="text-xl font-black text-slate-400">:</span>
-                  <div className="flex flex-col items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/10 border border-white/15 shadow-inner backdrop-blur-sm">
-                    <span className="text-xl sm:text-2xl font-black text-amber-400 font-display">
-                      {String(timer.seconds).padStart(2, '0')}
-                    </span>
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Secs</span>
-                  </div>
-                </div>
-
-                {/* Promo Code & Action Buttons */}
-                <div className="flex flex-wrap items-center gap-4 pt-3">
-                  <button
-                    onClick={() => handleAddToCart(offer)}
-                    className="px-8 py-3.5 rounded-2xl bg-white hover:bg-slate-100 text-slate-950 font-bold text-sm shadow-xl flex items-center gap-2 transform transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
-                  >
-                    <ShoppingBag className="w-4 h-4" />
-                    <span>Grab Flash Deal</span>
-                  </button>
-
-                  {offer.couponCode && (
-                    <button
-                      onClick={() => handleCopy(offer.couponCode)}
-                      className="px-5 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
-                    >
-                      {copiedCode === offer.couponCode ? (
-                        <Check className="w-4 h-4 text-emerald-400" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                      <span>CODE: {offer.couponCode}</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Image Showcase */}
-              <div className="lg:col-span-5 relative flex justify-center">
-                <Link
-                  href={`/product/${offer.productSlug || offer.productId}`}
-                  className="relative w-full max-w-sm aspect-square rounded-3xl overflow-hidden bg-white/10 border border-white/20 p-4 shadow-2xl group block"
-                >
-                  <img
-                    src={offer.productImage}
-                    alt={offer.productName}
-                    className="w-full h-full object-contain rounded-2xl group-hover:scale-105 transition-transform duration-500"
-                  />
-                  {savings > 0 && (
-                    <div className="absolute top-6 right-6 bg-amber-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl shadow-lg uppercase tracking-wider">
-                      Save ৳{savings.toLocaleString()}
-                    </div>
-                  )}
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  // If 2 Active Offers: Dual Column Grid
   return (
-    <section className="py-12 sm:py-16 bg-white relative overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-8 sm:mb-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900 text-white text-xs font-bold uppercase tracking-wider mb-2">
-            <Flame className="w-3.5 h-3.5 text-amber-400" />
-            <span>Exclusive Flash Offers</span>
+    <section className="py-12 sm:py-16 bg-slate-50/50 relative overflow-hidden">
+      {/* Decorative ambient background glows */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-gradient-to-r from-amber-500/5 via-rose-500/5 to-amber-500/5 blur-3xl pointer-events-none rounded-full" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        
+        {/* Section Header */}
+        <div className="flex flex-col items-center text-center mb-8 sm:mb-12 space-y-2">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-950 text-white text-xs font-bold uppercase tracking-widest shadow-md border border-slate-800">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+            <span>Limited Flash Sale</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-black font-display text-slate-950">
-            Limited Time <span className="text-slate-500 font-serif italic font-normal">Flash Deals</span>
+
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black font-display text-slate-950 tracking-tight">
+            Deal Of The <span className="bg-gradient-to-r from-amber-600 via-rose-600 to-amber-600 bg-clip-text text-transparent">Day</span>
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1">
-            Grab premium lifestyle discounts before the active countdown timers run out.
+          
+          <p className="text-xs sm:text-sm text-slate-600 max-w-md font-medium">
+            সীমিত সময়ের বিশেষ অফার! কাউন্টডাউন শেষ হওয়ার আগেই লুফে নিন আকর্ষণীয় মূল্যে।
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-          {offers.map((offer, index) => {
-            const timer = timeRemaining[offer._id || `offer_${index}`] || { hours: 24, minutes: 0, seconds: 0 };
-            const savings = offer.originalPrice > offer.offerPrice ? offer.originalPrice - offer.offerPrice : 0;
+        {/* 1 Offer Layout: Full Width Premium Showcase */}
+        {offers.length === 1 && (() => {
+          const offer = offers[0];
+          const timer = timeRemaining[offer._id || 'offer_0'] || { hours: 24, minutes: 0, seconds: 0 };
+          const savings = offer.originalPrice > offer.offerPrice ? offer.originalPrice - offer.offerPrice : 0;
+          const imgSrc = offer.productImage || offer.posterImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=800';
 
-            return (
-              <div
-                key={offer._id || index}
-                className="relative rounded-3xl overflow-hidden border border-slate-900 p-6 sm:p-8 bg-slate-950 text-white shadow-2xl flex flex-col justify-between"
-              >
-                {/* Accent glow */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+          return (
+            <div className="relative rounded-3xl sm:rounded-[32px] overflow-hidden bg-gradient-to-br from-slate-950 via-zinc-950 to-slate-900 text-white p-6 sm:p-10 lg:p-14 border border-amber-500/20 shadow-2xl ring-1 ring-white/10 group">
+              {/* Internal ambient radial glow */}
+              <div className="absolute -right-20 -bottom-20 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -left-20 -top-20 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
 
-                <div className="space-y-5 relative z-10">
-                  {/* Top Badge & Code */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-[11px] font-extrabold uppercase tracking-wider">
-                      <Flame className="w-3 h-3 text-amber-400" />
-                      <span>{offer.badgeText || 'FLASH DEAL'}</span>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10">
+                
+                {/* Left Column: Details & Pricing */}
+                <div className="lg:col-span-7 space-y-6">
+                  
+                  {/* Badge & Live Status */}
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-400/40 text-amber-300 text-[11px] font-black uppercase tracking-wider shadow-xs">
+                      <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400 animate-pulse" />
+                      <span>{offer.badgeText || '⚡ LIMITED FLASH DEAL'}</span>
                     </span>
 
-                    {offer.couponCode && (
-                      <button
-                        onClick={() => handleCopy(offer.couponCode)}
-                        className="px-3 py-1 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        {copiedCode === offer.couponCode ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                        <span>{offer.couponCode}</span>
-                      </button>
+                    <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>In Stock & Ready to Ship</span>
+                    </span>
+                  </div>
+
+                  {/* Title & Description */}
+                  <div className="space-y-2">
+                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display text-white tracking-tight leading-tight">
+                      {offer.title}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-300/90 max-w-xl leading-relaxed">
+                      {offer.subtitle || 'আমাদের প্রিমিয়াম কোয়ালিটি কালেকশনে আকর্ষণীয় ডিসকাউন্ট। অফার শেষ হওয়ার আগেই অর্ডার কনফার্ম করুন।'}
+                    </p>
+                  </div>
+
+                  {/* Price Section */}
+                  <div className="flex items-baseline gap-3.5 pt-1">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-white font-display tracking-tight">
+                        ৳{offer.offerPrice.toLocaleString()}
+                      </span>
+                    </div>
+
+                    {offer.originalPrice > offer.offerPrice && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-base sm:text-lg text-slate-400 line-through font-medium">
+                          ৳{offer.originalPrice.toLocaleString()}
+                        </span>
+                        <span className="px-3 py-1 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-xs font-black uppercase shadow-md">
+                          {offer.discountPercentage}% OFF
+                        </span>
+                      </div>
                     )}
                   </div>
 
-                  {/* Image & Title Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
-                    <div className="sm:col-span-7 space-y-3">
-                      <h3 className="text-xl sm:text-2xl font-black font-display text-white line-clamp-2">
-                        {offer.title}
-                      </h3>
-                      <p className="text-xs text-slate-300 line-clamp-2">
-                        {offer.subtitle || `Special limited offer on ${offer.productName}`}
-                      </p>
+                  {/* Countdown Timer Units */}
+                  <div className="pt-2 space-y-2">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Timer className="w-3.5 h-3.5 text-amber-400" />
+                      <span>অফারের বাকি সময়:</span>
+                    </span>
 
-                      {/* Pricing */}
-                      <div className="flex items-baseline gap-2.5 pt-1">
-                        <span className="text-2xl font-black text-white font-display">
-                          ৳{offer.offerPrice.toLocaleString()}
+                    <div className="flex items-center gap-2.5 sm:gap-3">
+                      <div className="flex flex-col items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/5 border border-white/10 shadow-inner backdrop-blur-md">
+                        <span className="text-xl sm:text-2xl font-black text-white font-display">
+                          {String(timer.hours).padStart(2, '0')}
                         </span>
-                        {offer.originalPrice > offer.offerPrice && (
-                          <>
-                            <span className="text-xs text-slate-400 line-through">
-                              ৳{offer.originalPrice.toLocaleString()}
-                            </span>
-                            <span className="px-2 py-0.5 rounded-lg bg-amber-400 text-slate-950 text-[10px] font-black uppercase">
-                              {offer.discountPercentage}% OFF
-                            </span>
-                          </>
-                        )}
+                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 tracking-wider">Hours</span>
+                      </div>
+
+                      <span className="text-xl font-black text-slate-500">:</span>
+
+                      <div className="flex flex-col items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/5 border border-white/10 shadow-inner backdrop-blur-md">
+                        <span className="text-xl sm:text-2xl font-black text-white font-display">
+                          {String(timer.minutes).padStart(2, '0')}
+                        </span>
+                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 tracking-wider">Mins</span>
+                      </div>
+
+                      <span className="text-xl font-black text-slate-500">:</span>
+
+                      <div className="flex flex-col items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-amber-500/10 border border-amber-400/30 shadow-inner backdrop-blur-md">
+                        <span className="text-xl sm:text-2xl font-black text-amber-400 font-display">
+                          {String(timer.seconds).padStart(2, '0')}
+                        </span>
+                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-amber-300 tracking-wider">Secs</span>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="sm:col-span-5 relative flex justify-center">
+                  {/* Clean CTA Buttons (No Promo Code) */}
+                  <div className="flex flex-wrap items-center gap-3 pt-3">
+                    <button
+                      onClick={() => handleAddToCart(offer)}
+                      className="flex-1 sm:flex-none px-8 py-4 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 transform transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+                    >
+                      <ShoppingBag className="w-4 h-4 text-slate-950" />
+                      <span>Grab Flash Deal Now</span>
+                      <ArrowRight className="w-4 h-4 text-slate-950" />
+                    </button>
+
+                    <Link
+                      href={`/product/${offer.productSlug || offer.productId}`}
+                      className="px-6 py-4 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/15 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <span>View Product Details</span>
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Right Column: Product Showcase Container */}
+                <div className="lg:col-span-5 relative flex justify-center">
+                  <Link
+                    href={`/product/${offer.productSlug || offer.productId}`}
+                    className="relative w-full max-w-sm sm:max-w-md aspect-square rounded-3xl overflow-hidden bg-white/5 border border-white/15 p-4 sm:p-6 shadow-2xl backdrop-blur-md group/img block"
+                  >
+                    <img
+                      src={imgSrc}
+                      alt={offer.productName}
+                      className="w-full h-full object-contain rounded-2xl group-hover/img:scale-105 transition-transform duration-500"
+                    />
+
+                    {savings > 0 && (
+                      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-xl shadow-lg uppercase tracking-wider">
+                        SAVE ৳{savings.toLocaleString()}
+                      </div>
+                    )}
+                  </Link>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 2 Offers Layout: Dual Column Grid */}
+        {offers.length > 1 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+            {offers.map((offer, index) => {
+              const timer = timeRemaining[offer._id || `offer_${index}`] || { hours: 24, minutes: 0, seconds: 0 };
+              const savings = offer.originalPrice > offer.offerPrice ? offer.originalPrice - offer.offerPrice : 0;
+              const imgSrc = offer.productImage || offer.posterImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=800';
+
+              return (
+                <div
+                  key={offer._id || index}
+                  className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-950 via-zinc-950 to-slate-900 text-white p-6 sm:p-8 border border-amber-500/20 shadow-2xl ring-1 ring-white/10 flex flex-col justify-between group"
+                >
+                  <div className="space-y-5">
+                    {/* Top Status & Badge */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[10px] font-black uppercase tracking-wider">
+                        <Flame className="w-3 h-3 fill-amber-400 text-amber-400 animate-pulse" />
+                        <span>{offer.badgeText || 'FLASH DEAL'}</span>
+                      </span>
+
+                      {savings > 0 && (
+                        <span className="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 text-[10px] font-black uppercase">
+                          SAVE ৳{savings.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Image & Title row */}
+                    <div className="flex gap-4 sm:gap-5 items-center">
                       <Link
                         href={`/product/${offer.productSlug || offer.productId}`}
-                        className="relative w-full aspect-square max-w-[160px] rounded-2xl overflow-hidden bg-white/10 border border-white/20 p-2 shadow-lg group block"
+                        className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-white/5 border border-white/10 p-2 shrink-0 overflow-hidden block group-hover:border-amber-400/40 transition-colors"
                       >
                         <img
-                          src={offer.productImage}
+                          src={imgSrc}
                           alt={offer.productName}
                           className="w-full h-full object-contain rounded-xl group-hover:scale-105 transition-transform duration-300"
                         />
-                        {savings > 0 && (
-                          <div className="absolute top-2 right-2 bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-md shadow-md uppercase">
-                            -৳{savings.toLocaleString()}
-                          </div>
-                        )}
                       </Link>
+
+                      <div className="space-y-1.5 min-w-0">
+                        <h4 className="text-base sm:text-lg font-bold text-white font-display line-clamp-1">
+                          {offer.title}
+                        </h4>
+                        <p className="text-xs text-slate-300 line-clamp-2">
+                          {offer.subtitle || offer.productName}
+                        </p>
+
+                        <div className="flex items-baseline gap-2 pt-1">
+                          <span className="text-xl sm:text-2xl font-black text-white font-display">
+                            ৳{offer.offerPrice.toLocaleString()}
+                          </span>
+                          {offer.originalPrice > offer.offerPrice && (
+                            <>
+                              <span className="text-xs text-slate-400 line-through">
+                                ৳{offer.originalPrice.toLocaleString()}
+                              </span>
+                              <span className="text-[10px] font-black text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">
+                                {offer.discountPercentage}% OFF
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Countdown Timer */}
+                    <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                        <Timer className="w-3.5 h-3.5 text-amber-400" />
+                        <span>সময় বাকি:</span>
+                      </span>
+
+                      <div className="flex items-center gap-1.5 text-xs font-mono font-bold">
+                        <span className="px-2 py-1 bg-white/10 rounded-lg text-white">
+                          {String(timer.hours).padStart(2, '0')}h
+                        </span>
+                        <span className="text-slate-500">:</span>
+                        <span className="px-2 py-1 bg-white/10 rounded-lg text-white">
+                          {String(timer.minutes).padStart(2, '0')}m
+                        </span>
+                        <span className="text-slate-500">:</span>
+                        <span className="px-2 py-1 bg-amber-400/20 text-amber-300 rounded-lg">
+                          {String(timer.seconds).padStart(2, '0')}s
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Countdown Timer Row */}
-                  <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl bg-white/10 border border-white/15">
-                        <span className="text-sm font-black text-white font-display">
-                          {String(timer.hours).padStart(2, '0')}
-                        </span>
-                        <span className="text-[8px] uppercase font-bold text-slate-400">Hrs</span>
-                      </div>
-                      <span className="font-bold text-slate-400">:</span>
-                      <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl bg-white/10 border border-white/15">
-                        <span className="text-sm font-black text-white font-display">
-                          {String(timer.minutes).padStart(2, '0')}
-                        </span>
-                        <span className="text-[8px] uppercase font-bold text-slate-400">Min</span>
-                      </div>
-                      <span className="font-bold text-slate-400">:</span>
-                      <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl bg-white/10 border border-white/15">
-                        <span className="text-sm font-black text-amber-400 font-display">
-                          {String(timer.seconds).padStart(2, '0')}
-                        </span>
-                        <span className="text-[8px] uppercase font-bold text-slate-400">Sec</span>
-                      </div>
-                    </div>
-
+                  {/* Clean CTA Button (No Promo Code) */}
+                  <div className="pt-5 border-t border-white/10 flex gap-2.5">
                     <button
                       onClick={() => handleAddToCart(offer)}
-                      className="px-5 py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-950 font-bold text-xs shadow-md flex items-center gap-1.5 transform transition-transform active:scale-95 cursor-pointer"
+                      className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shadow-lg flex items-center justify-center gap-2 transform active:scale-95 transition-all cursor-pointer"
                     >
                       <ShoppingBag className="w-3.5 h-3.5" />
-                      <span>Grab Deal</span>
+                      <span>Grab Flash Deal</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </button>
+
+                    <Link
+                      href={`/product/${offer.productSlug || offer.productId}`}
+                      className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/15 font-bold text-xs flex items-center justify-center transition-colors"
+                    >
+                      <span>Details</span>
+                    </Link>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );

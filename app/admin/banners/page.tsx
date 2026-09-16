@@ -6,13 +6,11 @@ import {
   Trash2, 
   Image as ImageIcon, 
   X, 
-  ExternalLink,
   ArrowRight,
   Eye,
   UploadCloud,
   Link as LinkIcon,
   CheckCircle2,
-  FileImage,
   RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
@@ -26,7 +24,7 @@ export default function AdminBannersPage() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [fileDetails, setFileDetails] = useState<{ name: string; size: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { success, error, info } = useToast();
+  const { success, error } = useToast();
 
   const [formData, setFormData] = useState({
     title: '',
@@ -40,47 +38,11 @@ export default function AdminBannersPage() {
       setLoading(true);
       const res = await fetch('/api/banners');
       const data = await res.json();
-      if (data.success) {
-        if (data.banners && data.banners.length > 0) {
-          setBanners(data.banners);
-          try {
-            localStorage.setItem('havitall_hero_banners', JSON.stringify(data.banners));
-          } catch (e) {}
-        } else {
-          // Check if local cache has stored posters (e.g. after serverless cold start)
-          try {
-            const cachedStr = localStorage.getItem('havitall_hero_banners');
-            if (cachedStr) {
-              const cached = JSON.parse(cachedStr);
-              if (Array.isArray(cached) && cached.length > 0) {
-                setBanners(cached);
-                // Re-sync cached banners to server
-                for (const b of cached) {
-                  fetch('/api/banners', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(b),
-                  }).catch(() => {});
-                }
-              } else {
-                setBanners([]);
-              }
-            } else {
-              setBanners([]);
-            }
-          } catch (e) {
-            setBanners([]);
-          }
-        }
+      if (data.success && Array.isArray(data.banners)) {
+        setBanners(data.banners);
       }
     } catch (err) {
       console.error('Error fetching banners:', err);
-      try {
-        const cachedStr = localStorage.getItem('havitall_hero_banners');
-        if (cachedStr) {
-          setBanners(JSON.parse(cachedStr));
-        }
-      } catch (e) {}
     } finally {
       setLoading(false);
     }
@@ -93,20 +55,15 @@ export default function AdminBannersPage() {
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Are you sure you want to delete this poster?`)) return;
     try {
-      const updated = banners.filter((b) => b._id !== id && b.title !== title);
-      setBanners(updated);
-      try {
-        localStorage.setItem('havitall_hero_banners', JSON.stringify(updated));
-      } catch (e) {}
-      
-      const res = await fetch(`/api/banners?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/banners?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         success('Hero poster deleted successfully');
+        loadBanners();
       } else {
         error(data.error || 'Failed to delete banner');
       }
-    } catch (err) {
+    } catch {
       error('Failed to delete banner');
     }
   };
@@ -217,18 +174,11 @@ export default function AdminBannersPage() {
         success('New hero poster added to storefront slider! 🎉');
         setIsModalOpen(false);
         setFileDetails(null);
-        if (data.banner) {
-          const updatedList = [data.banner, ...banners.filter((b) => b._id !== data.banner._id)];
-          setBanners(updatedList);
-          try {
-            localStorage.setItem('havitall_hero_banners', JSON.stringify(updatedList));
-          } catch (e) {}
-        }
         loadBanners();
       } else {
         error(data.error || 'Failed to create banner');
       }
-    } catch (err) {
+    } catch {
       error('Failed to create banner');
     }
   };
@@ -242,14 +192,14 @@ export default function AdminBannersPage() {
             Hero Slider Posters
           </h1>
           <p className="text-xs text-slate-500">
-            Directly upload poster images from your computer to display in the homepage interactive hero slider.
+            Directly upload poster images to display in the homepage interactive hero slider.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={loadBanners}
             disabled={loading}
-            className="p-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors"
+            className="p-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors cursor-pointer"
             title="Refresh banners"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />

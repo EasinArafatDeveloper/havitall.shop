@@ -17,6 +17,7 @@ import {
   Flame
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { trackPurchase } from '@/lib/fbpixel';
 
 export default function OrderSuccessPage() {
   const params = useParams();
@@ -42,6 +43,16 @@ export default function OrderSuccessPage() {
         const data = await res.json();
         if (data.success && data.order) {
           setOrder(data.order);
+
+          const purchaseKey = `fb_purchase_${data.order.orderNumber || data.order._id}`;
+          if (!sessionStorage.getItem(purchaseKey)) {
+            trackPurchase({
+              ids: (data.order.items || []).map((item: any) => item.productId || item.id),
+              value: data.order.totalAmount,
+              orderId: data.order.orderNumber || data.order._id,
+            });
+            sessionStorage.setItem(purchaseKey, '1');
+          }
         }
       } catch (err) {
         console.error('Error fetching order receipt:', err);

@@ -3,8 +3,8 @@ import connectToDatabase from '@/lib/mongodb';
 import Product from '@/lib/models/Product';
 import DeletedProduct from '@/lib/models/DeletedProduct';
 import FeaturedProduct from '@/lib/models/FeaturedProduct';
-import { memoryStore } from '@/lib/memoryStore';
 import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
+import { verifyAdminSession } from '@/lib/auth';
 
 export async function GET(
   request: Request,
@@ -12,69 +12,91 @@ export async function GET(
 ) {
   try {
     const { id } = params;
-
-    // 0. Check if deleted
-    if (memoryStore?.deletedProductIds?.includes(id)) {
-      return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Product ID is required' }, { status: 400 });
     }
 
+    const cleanId = id.trim().toLowerCase();
     const db = await connectToDatabase();
+
+    // Check if recorded as deleted
     if (db) {
-      const isDeletedRecord = await DeletedProduct.findOne({ identifier: id }).lean();
+      const isDeletedRecord = await DeletedProduct.findOne({
+        identifier: { $in: [id, cleanId] },
+      }).lean();
+
       if (isDeletedRecord) {
         return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
       }
     }
 
-    // Check featured/hot overrides in memory
-    const isFeaturedMem = memoryStore?.featuredProductIds?.includes(id);
-    const isHotMem = memoryStore?.hotProductIds?.includes(id);
+    // 1. Try MongoDB first (customized/local products take priority)
+    if (db) {
+      const filterConditions: any[] = [];
+      if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        filterConditions.push({ _id: id });
+      }
+      filterConditions.push({ slug: cleanId });
+      filterConditions.push({ businessKoroId: id });
 
-    // 1. Try Business Koro live products
+      const product: any = await Product.findOne({
+        $or: filterConditions,
+        isDeleted: { $ne: true },
+      }).lean();
+
+      if (product) {
+        return NextResponse.json({
+          success: true,
+          product: { ...product, _id: String(product._id) },
+          source: 'mongodb',
+        });
+      }
+    }
+
+    // 2. Try Business Koro live supplier products
     const bkProducts = await fetchBusinessKoroProducts();
     if (bkProducts && bkProducts.length > 0) {
-      const found = bkProducts.find((p: any) => p._id === id || p.slug === id || p.businessKoroId === id);
-      if (found) {
-        const prod = { ...found };
-        if (isFeaturedMem !== undefined) prod.isFeatured = isFeaturedMem;
-        if (isHotMem !== undefined) prod.isHot = isHotMem;
-        return NextResponse.json({ success: true, product: prod, source: 'businesskoro' });
-      }
-    }
-
-    // 2. Try MongoDB
-    if (db) {
-      let product = null;
-      if (id.match(/^[0-9a-fA-F]{24}$/)) {
-        product = await Product.findOne({ _id: id, isDeleted: { $ne: true } }).lean();
-      }
-      if (!product) {
-        product = await Product.findOne({ slug: id, isDeleted: { $ne: true } }).lean();
-      }
-      if (!product) {
-        product = await Product.findOne({ businessKoroId: id, isDeleted: { $ne: true } }).lean();
-      }
-      if (product) {
-        return NextResponse.json({ success: true, product, source: 'mongodb' });
-      }
-    }
-
-    // 3. Memory store fallback
-    const memProduct = memoryStore?.products.find(
-      (p) => (p._id === id || p.slug === id || p.businessKoroId === id) && !memoryStore.deletedProductIds?.includes(id)
-    );
-
-    if (!memProduct) {
-      return NextResponse.json(
-        { success: false, error: 'Product not found' },
-        { status: 404 }
+      const found = bkProducts.find(
+        (p: any) =>
+          String(p._id).toLowerCase() === cleanId ||
+          String(p.slug).toLowerCase() === cleanId ||
+          String(p.businessKoroId).toLowerCase() === cleanId
       );
+
+      if (found) {
+        // Fetch featured/hot status override if present in DB
+        let isFeat = Boolean(found.isFeatured);
+        let isH = Boolean(found.isHot);
+
+        if (db) {
+          const featRecord: any = await FeaturedProduct.findOne({
+            $or: [
+              { identifier: id },
+              { identifier: cleanId },
+              { slug: found.slug },
+              { businessKoroId: found.businessKoroId },
+            ],
+          }).lean();
+
+          if (featRecord) {
+            if (featRecord.isFeatured !== undefined) isFeat = Boolean(featRecord.isFeatured);
+            if (featRecord.isHot !== undefined) isH = Boolean(featRecord.isHot);
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          product: { ...found, isFeatured: isFeat, isHot: isH },
+          source: 'businesskoro',
+        });
+      }
     }
 
-    return NextResponse.json({ success: true, product: memProduct, source: 'memory' });
-  } catch (error: any) {
-    console.error('Error fetching single product:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error fetching single product:', err.message);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
 
@@ -82,126 +104,152 @@ export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const session = verifyAdminSession(request);
+  if (!session.authenticated) {
+    return NextResponse.json({ success: false, error: 'Unauthorized. Admin access required.' }, { status: 401 });
+  }
+
   try {
     const { id } = params;
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const db = await connectToDatabase();
 
-    if (body.originalPrice && body.price && Number(body.originalPrice) > Number(body.price)) {
-      body.discountPercentage = Math.round(
-        ((Number(body.originalPrice) - Number(body.price)) / Number(body.originalPrice)) * 100
+    if (!db) {
+      return NextResponse.json({ success: false, error: 'Database service unavailable.' }, { status: 503 });
+    }
+
+    const cleanId = id.trim().toLowerCase();
+
+    // Calculate discount percentage if original price provided
+    if (body.originalPrice !== undefined && body.price !== undefined) {
+      const orig = Number(body.originalPrice);
+      const prc = Number(body.price);
+      if (orig > prc && orig > 0) {
+        body.discountPercentage = Math.round(((orig - prc) / orig) * 100);
+      } else {
+        body.discountPercentage = 0;
+      }
+    }
+
+    // 1. Sync Featured / Hot flag in FeaturedProduct collection
+    if (body.isFeatured !== undefined || body.isHot !== undefined) {
+      const matchConditions: any[] = [{ identifier: id }, { identifier: cleanId }];
+      if (body.slug) matchConditions.push({ slug: String(body.slug).toLowerCase().trim() });
+      if (body.businessKoroId) matchConditions.push({ businessKoroId: String(body.businessKoroId) });
+
+      await FeaturedProduct.findOneAndUpdate(
+        { $or: matchConditions },
+        {
+          $set: {
+            identifier: id,
+            slug: body.slug || cleanId,
+            name: body.name,
+            businessKoroId: body.businessKoroId || id,
+            ...(body.isFeatured !== undefined ? { isFeatured: Boolean(body.isFeatured) } : {}),
+            ...(body.isHot !== undefined ? { isHot: Boolean(body.isHot) } : {}),
+          },
+        },
+        { upsert: true, new: true }
       );
     }
 
-    // 1. Update memory store & flags
-    if (memoryStore) {
-      if (!memoryStore.featuredProductIds) memoryStore.featuredProductIds = [];
-      if (!memoryStore.hotProductIds) memoryStore.hotProductIds = [];
-      if (!memoryStore.productOverrides) memoryStore.productOverrides = {};
+    // 2. Find and update existing product in MongoDB or create a persistent record
+    const filterConditions: any[] = [];
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      filterConditions.push({ _id: id });
+    }
+    filterConditions.push({ slug: cleanId });
+    filterConditions.push({ businessKoroId: id });
+    if (body.slug) filterConditions.push({ slug: String(body.slug).toLowerCase().trim() });
+    if (body.businessKoroId) filterConditions.push({ businessKoroId: String(body.businessKoroId) });
+    if (body._id && String(body._id).match(/^[0-9a-fA-F]{24}$/)) {
+      filterConditions.push({ _id: body._id });
+    }
 
-      const identifiersToAdd = [
-        id,
-        body.slug,
-        body.name,
-        body.businessKoroId,
-        body._id,
-      ]
-        .filter(Boolean)
-        .map((s: string) => String(s).toLowerCase().trim());
+    let existingProduct = await Product.findOne({ $or: filterConditions });
+    let savedProduct: any = null;
 
-      if (body.isFeatured !== undefined) {
-        if (body.isFeatured === true) {
-          identifiersToAdd.forEach((ident) => {
-            if (!memoryStore.featuredProductIds.includes(ident)) {
-              memoryStore.featuredProductIds.push(ident);
-            }
-          });
-        } else {
-          memoryStore.featuredProductIds = memoryStore.featuredProductIds.filter(
-            (i) => !identifiersToAdd.includes(String(i).toLowerCase().trim())
-          );
-        }
-      }
+    if (existingProduct) {
+      // Update existing MongoDB document
+      if (body.name) existingProduct.name = body.name.trim();
+      if (body.price !== undefined) existingProduct.price = Number(body.price);
+      if (body.originalPrice !== undefined) existingProduct.originalPrice = Number(body.originalPrice);
+      if (body.discountPercentage !== undefined) existingProduct.discountPercentage = Number(body.discountPercentage);
+      if (body.category) existingProduct.category = body.category.trim();
+      if (body.stock !== undefined) existingProduct.stock = Number(body.stock);
+      if (body.description) existingProduct.description = body.description;
+      if (body.shortDescription !== undefined) existingProduct.shortDescription = body.shortDescription;
+      if (body.images && Array.isArray(body.images) && body.images.length > 0) existingProduct.images = body.images;
+      if (body.isHot !== undefined) existingProduct.isHot = Boolean(body.isHot);
+      if (body.isFeatured !== undefined) existingProduct.isFeatured = Boolean(body.isFeatured);
+      if (body.badge !== undefined) existingProduct.badge = body.badge;
+      if (body.variants) existingProduct.variants = body.variants;
+      if (body.features) existingProduct.features = body.features;
+      if (body.tags) existingProduct.tags = body.tags;
+      if (body.slug) existingProduct.slug = String(body.slug).toLowerCase().trim();
+      if (body.businessKoroId) existingProduct.businessKoroId = String(body.businessKoroId);
+      existingProduct.isDeleted = false;
+      existingProduct.source = 'customized';
 
-      if (body.isHot !== undefined) {
-        if (body.isHot === true) {
-          identifiersToAdd.forEach((ident) => {
-            if (!memoryStore.hotProductIds.includes(ident)) {
-              memoryStore.hotProductIds.push(ident);
-            }
-          });
-        } else {
-          memoryStore.hotProductIds = memoryStore.hotProductIds.filter(
-            (i) => !identifiersToAdd.includes(String(i).toLowerCase().trim())
-          );
-        }
-      }
+      savedProduct = await existingProduct.save();
+    } else {
+      // Product was originally from Business Koro / external and is now being saved into MongoDB
+      const bkProducts = await fetchBusinessKoroProducts();
+      const bkOriginal = bkProducts?.find(
+        (p: any) =>
+          String(p._id).toLowerCase() === cleanId ||
+          String(p.slug).toLowerCase() === cleanId ||
+          String(p.businessKoroId).toLowerCase() === cleanId
+      );
 
-      memoryStore.productOverrides[id] = {
-        ...(memoryStore.productOverrides[id] || {}),
-        ...body,
+      const targetSlug = (
+        body.slug ||
+        bkOriginal?.slug ||
+        (body.name ? body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : cleanId)
+      ).toLowerCase().trim();
+
+      const newProductDoc = {
+        name: body.name || bkOriginal?.name || 'Custom Product',
+        slug: targetSlug,
+        businessKoroId: body.businessKoroId || bkOriginal?.businessKoroId || id,
+        description: body.description || bkOriginal?.description || 'Premium lifestyle product.',
+        shortDescription: body.shortDescription || bkOriginal?.shortDescription || '',
+        price: body.price !== undefined ? Number(body.price) : (bkOriginal?.price || 999),
+        originalPrice: body.originalPrice !== undefined ? Number(body.originalPrice) : bkOriginal?.originalPrice,
+        discountPercentage: body.discountPercentage !== undefined ? Number(body.discountPercentage) : (bkOriginal?.discountPercentage || 0),
+        category: body.category || bkOriginal?.category || 'all-collection',
+        images: Array.isArray(body.images) && body.images.length > 0
+          ? body.images
+          : (bkOriginal?.images || ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000']),
+        stock: body.stock !== undefined ? Number(body.stock) : (bkOriginal?.stock ?? 10),
+        rating: bkOriginal?.rating || 4.8,
+        numReviews: bkOriginal?.numReviews || 12,
+        isHot: body.isHot !== undefined ? Boolean(body.isHot) : Boolean(bkOriginal?.isHot),
+        isFeatured: body.isFeatured !== undefined ? Boolean(body.isFeatured) : Boolean(bkOriginal?.isFeatured),
+        badge: body.badge || bkOriginal?.badge || '',
+        variants: body.variants || bkOriginal?.variants || { colors: [], sizes: [] },
+        features: body.features || bkOriginal?.features || [],
+        tags: body.tags || bkOriginal?.tags || [],
+        isDeleted: false,
+        source: 'customized',
       };
 
-      const memIdx = memoryStore.products.findIndex((p) => p._id === id || p.slug === id || p.businessKoroId === id);
-      if (memIdx >= 0) {
-        memoryStore.products[memIdx] = {
-          ...memoryStore.products[memIdx],
-          ...body,
-          updatedAt: new Date().toISOString(),
-        };
-      }
+      savedProduct = await Product.findOneAndUpdate(
+        { slug: targetSlug },
+        { $set: newProductDoc },
+        { upsert: true, new: true }
+      );
     }
 
-    // 2. Update MongoDB if connected
-    if (db) {
-      try {
-        if (body.isFeatured !== undefined || body.isHot !== undefined) {
-          const matchConditions: any[] = [{ identifier: id }];
-          if (body.slug) matchConditions.push({ slug: body.slug });
-          if (body.name) matchConditions.push({ name: body.name });
-          if (body.businessKoroId) matchConditions.push({ businessKoroId: body.businessKoroId });
-
-          await FeaturedProduct.findOneAndUpdate(
-            { $or: matchConditions },
-            {
-              identifier: id,
-              slug: body.slug || id,
-              name: body.name,
-              businessKoroId: body.businessKoroId,
-              ...(body.isFeatured !== undefined ? { isFeatured: body.isFeatured } : {}),
-              ...(body.isHot !== undefined ? { isHot: body.isHot } : {}),
-            },
-            { upsert: true, new: true }
-          );
-        }
-
-        let updated = null;
-        if (id.match(/^[0-9a-fA-F]{24}$/)) {
-          updated = await Product.findByIdAndUpdate(id, body, { new: true }).lean();
-        } else {
-          updated = await Product.findOneAndUpdate(
-            { $or: [{ slug: id }, { businessKoroId: id }, { _id: id }] },
-            body,
-            { new: true, upsert: true }
-          ).lean();
-        }
-        if (updated) {
-          return NextResponse.json({ success: true, product: updated, source: 'mongodb' });
-        }
-      } catch (dbErr) {
-        console.warn('MongoDB PUT error in product:', dbErr);
-      }
-    }
-
-    const memProduct = memoryStore?.products.find((p) => p._id === id || p.slug === id || p.businessKoroId === id);
     return NextResponse.json({
       success: true,
-      product: { ...(memProduct || {}), ...body, _id: id },
-      source: 'memory',
+      product: { ...savedProduct.toObject ? savedProduct.toObject() : savedProduct, _id: String(savedProduct._id) },
+      source: 'mongodb',
     });
-  } catch (error: any) {
-    console.error('Error updating product:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error updating product:', err.message);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
 
@@ -209,47 +257,45 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const session = verifyAdminSession(request);
+  if (!session.authenticated) {
+    return NextResponse.json({ success: false, error: 'Unauthorized. Admin access required.' }, { status: 401 });
+  }
+
   try {
     const { id } = params;
     const db = await connectToDatabase();
 
-    // 1. Permanently record deletion identifier in MongoDB
-    if (db) {
-      try {
-        await DeletedProduct.findOneAndUpdate(
-          { identifier: id },
-          { identifier: id, deletedAt: new Date() },
-          { upsert: true }
-        );
-
-        if (id.match(/^[0-9a-fA-F]{24}$/)) {
-          await Product.findByIdAndDelete(id);
-        } else {
-          await Product.findOneAndDelete({ $or: [{ slug: id }, { businessKoroId: id }, { _id: id }] });
-        }
-      } catch (dbErr) {
-        console.warn('MongoDB product deletion error:', dbErr);
-      }
+    if (!db) {
+      return NextResponse.json({ success: false, error: 'Database service unavailable.' }, { status: 503 });
     }
 
-    // 2. Add to memory store deleted tracking & clean memory list
-    if (memoryStore) {
-      if (!memoryStore.deletedProductIds) {
-        memoryStore.deletedProductIds = [];
-      }
-      if (!memoryStore.deletedProductIds.includes(id)) {
-        memoryStore.deletedProductIds.push(id);
-      }
-      memoryStore.featuredProductIds = (memoryStore.featuredProductIds || []).filter((i) => i !== id);
-      memoryStore.hotProductIds = (memoryStore.hotProductIds || []).filter((i) => i !== id);
-      memoryStore.products = memoryStore.products.filter(
-        (p) => p._id !== id && p.slug !== id && p.businessKoroId !== id
+    // Record deletion identifier in DeletedProduct collection
+    await DeletedProduct.findOneAndUpdate(
+      { identifier: id },
+      { $set: { identifier: id, deletedAt: new Date() } },
+      { upsert: true }
+    );
+
+    // Delete or mark deleted in Product collection
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      await Product.findByIdAndUpdate(id, { $set: { isDeleted: true } });
+    } else {
+      await Product.updateMany(
+        { $or: [{ slug: id.toLowerCase() }, { businessKoroId: id }, { _id: id }] },
+        { $set: { isDeleted: true } }
       );
     }
 
+    // Remove from FeaturedProduct if present
+    await FeaturedProduct.deleteMany({
+      $or: [{ identifier: id }, { slug: id }, { businessKoroId: id }],
+    });
+
     return NextResponse.json({ success: true, message: 'Product deleted permanently' });
-  } catch (error: any) {
-    console.error('Error deleting product:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error deleting product:', err.message);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

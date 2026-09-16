@@ -208,40 +208,6 @@ export default function CartDrawer() {
             {/* Cart Footer */}
             {cart.length > 0 && (
               <div className="p-5 bg-slate-50 border-t border-slate-200 space-y-4">
-                {/* Coupon Input */}
-                <form onSubmit={handleApplyCoupon} className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      placeholder="Promo code (HAVITALL20)"
-                      value={couponInput}
-                      onChange={(e) => setCouponInput(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 uppercase tracking-wider focus:outline-none focus:border-slate-950"
-                    />
-                    <Tag className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                  </div>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors"
-                  >
-                    Apply
-                  </button>
-                </form>
-
-                {appliedCoupon && (
-                  <div className="flex items-center justify-between text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-lg">
-                    <span className="flex items-center gap-1.5 font-semibold">
-                      <Check className="w-3.5 h-3.5 text-emerald-600" /> Coupon "{appliedCoupon}" Active
-                    </span>
-                    <button
-                      onClick={removeCoupon}
-                      className="text-slate-500 hover:text-slate-900 underline text-[11px]"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
-
                 {/* Subtotal & Breakdown */}
                 <div className="space-y-1.5 text-xs text-slate-600">
                   <div className="flex justify-between">

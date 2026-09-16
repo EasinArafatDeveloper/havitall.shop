@@ -6,13 +6,9 @@ import {
   Search, 
   Edit3, 
   Trash2, 
-  Sparkles, 
   X, 
-  Check, 
-  Image as ImageIcon,
-  Flame,
-  Star,
-  ExternalLink
+  Flame, 
+  Star 
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 
@@ -54,24 +50,7 @@ export default function AdminProductsPage() {
       const prodData = await prodRes.json();
       const catData = await catRes.json();
       if (prodData.success) {
-        let loadedProducts = prodData.products || [];
-        
-        // Sync with local featured cache if available
-        try {
-          const cachedFeatStr = localStorage.getItem('havitall_featured_ids');
-          if (cachedFeatStr) {
-            const featIds: string[] = JSON.parse(cachedFeatStr);
-            if (Array.isArray(featIds) && featIds.length > 0) {
-              const featSet = new Set(featIds);
-              loadedProducts = loadedProducts.map((p: any) => ({
-                ...p,
-                isFeatured: featSet.has(p._id) || featSet.has(p.slug) || featSet.has(p.businessKoroId) || Boolean(p.isFeatured),
-              }));
-            }
-          }
-        } catch (e) {}
-
-        setProducts(loadedProducts);
+        setProducts(prodData.products || []);
       }
       if (catData.success) setCategories(catData.categories || []);
     } catch (err) {
@@ -90,27 +69,16 @@ export default function AdminProductsPage() {
     const targetId = product.slug || product._id || product.businessKoroId;
 
     // Optimistic UI update
-    const updatedProducts = products.map((p) =>
-      (p._id === product._id || p.slug === product.slug || p.businessKoroId === product.businessKoroId || p.name === product.name)
-        ? { ...p, isFeatured: newStatus }
-        : p
+    setProducts((prev) =>
+      prev.map((p) =>
+        p._id === product._id || p.slug === product.slug
+          ? { ...p, isFeatured: newStatus }
+          : p
+      )
     );
-    setProducts(updatedProducts);
-
-    // Save to localStorage with multi-identifiers
-    try {
-      const activeFeatured = updatedProducts
-        .filter((p) => Boolean(p.isFeatured))
-        .flatMap((p) => [p.slug, p._id, p.businessKoroId, p.name])
-        .filter(Boolean);
-      localStorage.setItem('havitall_featured_ids', JSON.stringify(activeFeatured));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('havitall:featured-updated'));
-      }
-    } catch (e) {}
 
     try {
-      const res = await fetch(`/api/products/${targetId}`, {
+      const res = await fetch(`/api/products/${encodeURIComponent(targetId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -118,13 +86,6 @@ export default function AdminProductsPage() {
           name: product.name,
           slug: product.slug,
           businessKoroId: product.businessKoroId,
-          _id: product._id,
-          price: product.price,
-          originalPrice: product.originalPrice,
-          category: product.category,
-          images: product.images,
-          stock: product.stock,
-          description: product.description,
         }),
       });
       const data = await res.json();
@@ -135,10 +96,12 @@ export default function AdminProductsPage() {
           info(`Removed "${product.name}" from Featured Collections.`);
         }
       } else {
-        error('Failed to update featured status on server');
+        error(data.error || 'Failed to update featured status on server');
+        loadData();
       }
-    } catch (err) {
-      error('Network warning updating status');
+    } catch {
+      error('Network error updating status');
+      loadData();
     }
   };
 
@@ -147,27 +110,23 @@ export default function AdminProductsPage() {
     const targetId = product.slug || product._id || product.businessKoroId;
 
     // Optimistic UI update
-    const updatedProducts = products.map((p) =>
-      (p._id === product._id || p.slug === product.slug || p.businessKoroId === product.businessKoroId)
-        ? { ...p, isHot: newStatus }
-        : p
+    setProducts((prev) =>
+      prev.map((p) =>
+        p._id === product._id || p.slug === product.slug
+          ? { ...p, isHot: newStatus }
+          : p
+      )
     );
-    setProducts(updatedProducts);
 
     try {
-      const res = await fetch(`/api/products/${targetId}`, {
+      const res = await fetch(`/api/products/${encodeURIComponent(targetId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           isHot: newStatus,
           name: product.name,
           slug: product.slug,
-          price: product.price,
-          originalPrice: product.originalPrice,
-          category: product.category,
-          images: product.images,
-          stock: product.stock,
-          description: product.description,
+          businessKoroId: product.businessKoroId,
         }),
       });
       const data = await res.json();
@@ -177,9 +136,13 @@ export default function AdminProductsPage() {
         } else {
           info(`Removed "${product.name}" from Hot Deals.`);
         }
+      } else {
+        error(data.error || 'Failed to update hot status on server');
+        loadData();
       }
-    } catch (err) {
-      console.warn('Network error:', err);
+    } catch {
+      error('Network error updating hot status');
+      loadData();
     }
   };
 
@@ -207,20 +170,26 @@ export default function AdminProductsPage() {
   const handleOpenEdit = (product: any) => {
     setEditingProduct(product);
     setFormData({
-      name: product.name,
-      price: String(product.price || ''),
-      originalPrice: String(product.originalPrice || ''),
+      name: product.name || '',
+      price: String(product.price ?? ''),
+      originalPrice: String(product.originalPrice ?? ''),
       category: product.category || 'luxury-watches',
-      stock: String(product.stock || 10),
+      stock: String(product.stock ?? 10),
       imageUrl: product.images?.[0] || product.image || '',
       description: product.description || '',
       shortDescription: product.shortDescription || '',
       isHot: Boolean(product.isHot),
       isFeatured: Boolean(product.isFeatured),
       badge: product.badge || '',
-      colors: product.variants?.colors?.join(', ') || '',
-      sizes: product.variants?.sizes?.join(', ') || '',
-      features: product.features?.join(', ') || '',
+      colors: Array.isArray(product.variants?.colors)
+        ? product.variants.colors.join(', ')
+        : (typeof product.variants?.colors === 'string' ? product.variants.colors : ''),
+      sizes: Array.isArray(product.variants?.sizes)
+        ? product.variants.sizes.join(', ')
+        : (typeof product.variants?.sizes === 'string' ? product.variants.sizes : ''),
+      features: Array.isArray(product.features)
+        ? product.features.join(', ')
+        : (typeof product.features === 'string' ? product.features : ''),
     });
     setIsModalOpen(true);
   };
@@ -228,7 +197,7 @@ export default function AdminProductsPage() {
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
     try {
-      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/products/${encodeURIComponent(id)}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         success(`Product "${name}" deleted successfully`);
@@ -236,7 +205,7 @@ export default function AdminProductsPage() {
       } else {
         error(data.error || 'Failed to delete product');
       }
-    } catch (err) {
+    } catch {
       error('Failed to delete product');
     }
   };
@@ -249,17 +218,20 @@ export default function AdminProductsPage() {
     }
 
     const payload = {
-      name: formData.name,
+      _id: editingProduct?._id,
+      slug: editingProduct?.slug,
+      businessKoroId: editingProduct?.businessKoroId || (editingProduct?.source === 'businesskoro' ? editingProduct?._id : undefined),
+      name: formData.name.trim(),
       price: Number(formData.price),
       originalPrice: formData.originalPrice ? Number(formData.originalPrice) : undefined,
       category: formData.category,
       stock: Number(formData.stock),
-      images: [formData.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'],
-      description: formData.description,
-      shortDescription: formData.shortDescription,
+      images: [formData.imageUrl.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'],
+      description: formData.description.trim(),
+      shortDescription: formData.shortDescription.trim(),
       isHot: formData.isHot,
       isFeatured: formData.isFeatured,
-      badge: formData.badge,
+      badge: formData.badge.trim(),
       variants: {
         colors: formData.colors.split(',').map((s) => s.trim()).filter(Boolean),
         sizes: formData.sizes.split(',').map((s) => s.trim()).filter(Boolean),
@@ -270,7 +242,8 @@ export default function AdminProductsPage() {
     try {
       let res;
       if (editingProduct) {
-        res = await fetch(`/api/products/${editingProduct._id || editingProduct.slug}`, {
+        const targetId = editingProduct._id || editingProduct.slug || editingProduct.businessKoroId;
+        res = await fetch(`/api/products/${encodeURIComponent(targetId)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -285,13 +258,13 @@ export default function AdminProductsPage() {
 
       const data = await res.json();
       if (data.success) {
-        success(editingProduct ? 'Product updated!' : 'New product published successfully! 🎉');
+        success(editingProduct ? 'Product updated successfully! 🎉' : 'New product published successfully! 🎉');
         setIsModalOpen(false);
         loadData();
       } else {
         error(data.error || 'Failed to save product');
       }
-    } catch (err) {
+    } catch {
       error('Error saving product');
     }
   };
@@ -341,7 +314,7 @@ export default function AdminProductsPage() {
             ⭐ Homepage Featured Collections Selection:
           </p>
           <p className="text-slate-600 leading-relaxed">
-            যে যে প্রোডাক্ট আপনি হোমপেজের <strong>"Featured Collections"</strong> সেকশনে দেখাতে চান, নিচের টেবিলে শুধু সেই প্রোডাক্টটির <strong>⭐ Star</strong> বাটনে ক্লিক করে গোল্ডেন অন করুন। বর্তমানে <strong>{featuredCount} টি</strong> প্রোডাক্ট হোমপেজে Featured হিসেবে দেখানো হচ্ছে।
+            যে যে প্রোডাক্ট আপনি হোমপেজের <strong>"Featured Collections"</strong> সেকশনে দেখাতে চান, নিচের টেবিলে শুধু সেই প্রোডাক্টটির <strong>⭐ Star</strong> বাটনে ক্লিক করে গোল্ডেন অন করুন। বর্তমানে <strong>{featuredCount} টি</strong> প্রোডাক্ট হোমপেজে Featured হিসেবে ডাটাবেজে সংরক্ষিত আছে।
           </p>
         </div>
       </div>
@@ -557,6 +530,7 @@ export default function AdminProductsPage() {
                   <input
                     type="number"
                     required
+                    min="0"
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
@@ -567,6 +541,7 @@ export default function AdminProductsPage() {
                   <label className="font-semibold text-slate-700">Original Price (For Discount %)</label>
                   <input
                     type="number"
+                    min="0"
                     value={formData.originalPrice}
                     onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
@@ -592,6 +567,7 @@ export default function AdminProductsPage() {
                   <label className="font-semibold text-slate-700">Stock Quantity</label>
                   <input
                     type="number"
+                    min="0"
                     value={formData.stock}
                     onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"

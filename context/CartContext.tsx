@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useToast } from './ToastContext';
+import { trackAddToCart } from '@/lib/fbpixel';
 
 export interface CartItem {
   id: string;
@@ -132,6 +133,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       };
 
       return [...prev, newItem];
+    });
+
+    trackAddToCart({
+      id: product._id || product.id || product.slug,
+      name: product.name,
+      price: Number(product.offerPrice || product.price),
+      quantity,
     });
 
     if (isOfferProduct) {

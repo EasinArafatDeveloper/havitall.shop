@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
+import { trackInitiateCheckout } from '@/lib/fbpixel';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -47,6 +48,17 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'BKASH' | 'NAGAD' | 'CARD'>('COD');
   const [couponInput, setCouponInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (cart.length > 0) {
+      trackInitiateCheckout({
+        ids: cart.map((item) => item.productId),
+        value: total,
+        numItems: cart.reduce((sum, item) => sum + item.quantity, 0),
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // If cart is empty, show empty state
   if (cart.length === 0) {
@@ -411,44 +423,6 @@ export default function CheckoutPage() {
                     </span>
                   </div>
                 ))}
-              </div>
-
-              {/* Promo Coupon Box */}
-              <div className="pt-2 border-t border-slate-100">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      placeholder="Promo Code (HAVITALL20)"
-                      value={couponInput}
-                      onChange={(e) => setCouponInput(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 uppercase tracking-wider focus:outline-none focus:border-slate-950 focus:bg-white"
-                    />
-                    <Tag className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleApplyCoupon}
-                    className="px-4 py-2 bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors"
-                  >
-                    Apply
-                  </button>
-                </div>
-
-                {appliedCoupon && (
-                  <div className="flex items-center justify-between text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-lg mt-2">
-                    <span className="flex items-center gap-1.5 font-semibold">
-                      <Check className="w-3.5 h-3.5 text-emerald-600" /> Coupon "{appliedCoupon}" applied
-                    </span>
-                    <button
-                      type="button"
-                      onClick={removeCoupon}
-                      className="text-slate-500 hover:text-slate-900 underline text-[11px]"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Financial Calculation */}

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Banner from '@/lib/models/Banner';
-import { memoryStore } from '@/lib/memoryStore';
+import { verifyAdminSession } from '@/lib/auth';
 
 export async function GET() {
   try {
@@ -11,60 +11,61 @@ export async function GET() {
       return NextResponse.json({ success: true, banners: banners || [], source: 'mongodb' });
     }
 
-    return NextResponse.json({
-      success: true,
-      banners: memoryStore?.banners?.filter((b) => b.isActive) || [],
-      source: 'memory',
-    });
-  } catch (error: any) {
-    console.error('Error fetching banners:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Database service unavailable' }, { status: 503 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error fetching banners:', err.message);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
+  const session = verifyAdminSession(request);
+  if (!session.authenticated) {
+    return NextResponse.json({ success: false, error: 'Unauthorized. Admin access required.' }, { status: 401 });
+  }
+
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { title, image } = body;
 
-    if (!title || !image) {
+    if (!title || typeof title !== 'string' || !title.trim() || !image) {
       return NextResponse.json({ success: false, error: 'Title and image are required' }, { status: 400 });
     }
 
     const newBannerData = {
-      title,
-      subtitle: body.subtitle || '',
-      tagline: body.tagline || 'SPECIAL FEATURE',
-      image,
-      buttonText: body.buttonText || 'Shop Now',
-      buttonLink: body.buttonLink || '/shop',
-      discountBadge: body.discountBadge || '',
+      title: title.trim(),
+      subtitle: body.subtitle ? String(body.subtitle).trim() : '',
+      tagline: body.tagline ? String(body.tagline).trim() : 'SPECIAL FEATURE',
+      image: String(image).trim(),
+      buttonText: body.buttonText ? String(body.buttonText).trim() : 'Shop Now',
+      buttonLink: body.buttonLink ? String(body.buttonLink).trim() : '/shop',
+      discountBadge: body.discountBadge ? String(body.discountBadge).trim() : '',
       bgColor: body.bgColor || 'from-slate-950 via-rose-950/80 to-slate-900',
       order: Number(body.order || 0),
       isActive: body.isActive ?? true,
     };
 
     const db = await connectToDatabase();
-    if (db) {
-      const banner = await Banner.create(newBannerData);
-      memoryStore?.banners.unshift(banner.toObject());
-      return NextResponse.json({ success: true, banner, source: 'mongodb' });
+    if (!db) {
+      return NextResponse.json({ success: false, error: 'Database service unavailable' }, { status: 503 });
     }
 
-    const memBanner = {
-      ...newBannerData,
-      _id: `ban_${Date.now()}`,
-    };
-    memoryStore?.banners.unshift(memBanner);
-
-    return NextResponse.json({ success: true, banner: memBanner, source: 'memory' });
-  } catch (error: any) {
-    console.error('Error creating banner:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    const banner = await Banner.create(newBannerData);
+    return NextResponse.json({ success: true, banner, source: 'mongodb' });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error creating banner:', err.message);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
+  const session = verifyAdminSession(request);
+  if (!session.authenticated) {
+    return NextResponse.json({ success: false, error: 'Unauthorized. Admin access required.' }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -74,21 +75,20 @@ export async function DELETE(request: Request) {
     }
 
     const db = await connectToDatabase();
-    if (db) {
-      if (id.match(/^[0-9a-fA-F]{24}$/)) {
-        await Banner.findByIdAndDelete(id);
-      } else {
-        await Banner.findOneAndDelete({ $or: [{ _id: id }, { title: id }] });
-      }
+    if (!db) {
+      return NextResponse.json({ success: false, error: 'Database service unavailable' }, { status: 503 });
     }
 
-    if (memoryStore) {
-      memoryStore.banners = memoryStore.banners.filter((b) => b._id !== id && b.title !== id);
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      await Banner.findByIdAndDelete(id);
+    } else {
+      await Banner.findOneAndDelete({ $or: [{ _id: id }, { title: id }] });
     }
 
     return NextResponse.json({ success: true, message: 'Banner removed' });
-  } catch (error: any) {
-    console.error('Error deleting banner:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error deleting banner:', err.message);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

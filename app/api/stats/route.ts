@@ -5,25 +5,34 @@ import Order from '@/lib/models/Order';
 import Category from '@/lib/models/Category';
 import Banner from '@/lib/models/Banner';
 import DeletedProduct from '@/lib/models/DeletedProduct';
-import { memoryStore } from '@/lib/memoryStore';
 import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
+import { verifyAdminSession } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const session = verifyAdminSession(request);
+  if (!session.authenticated) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized. Admin credentials required.' },
+      { status: 401 }
+    );
+  }
+
   try {
     const db = await connectToDatabase();
-    const deletedSet = new Set<string>(memoryStore?.deletedProductIds || []);
+    if (!db) {
+      return NextResponse.json({ success: false, error: 'Database unavailable' }, { status: 503 });
+    }
 
-    if (db) {
-      try {
-        const deletedRecords = await DeletedProduct.find().lean();
-        if (deletedRecords && deletedRecords.length > 0) {
-          deletedRecords.forEach((d: any) => {
-            if (d.identifier) deletedSet.add(d.identifier);
-          });
-        }
-      } catch (e) {
-        console.warn('DeletedProduct query warning in stats:', e);
+    const deletedSet = new Set<string>();
+    try {
+      const deletedRecords = await DeletedProduct.find().lean();
+      if (deletedRecords && deletedRecords.length > 0) {
+        deletedRecords.forEach((d: any) => {
+          if (d.identifier) deletedSet.add(String(d.identifier).toLowerCase().trim());
+        });
       }
+    } catch (e) {
+      console.warn('DeletedProduct query in stats:', e);
     }
 
     // Count distinct active products (BK + local)
@@ -31,74 +40,60 @@ export async function GET() {
     const bkProducts = await fetchBusinessKoroProducts();
     if (bkProducts && bkProducts.length > 0) {
       for (const p of bkProducts) {
-        if (!deletedSet.has(String(p._id)) && !deletedSet.has(String(p.slug)) && !deletedSet.has(String(p.businessKoroId))) {
-          productKeys.add(p.slug || p._id);
+        const idStr = String(p._id).toLowerCase();
+        const slugStr = String(p.slug).toLowerCase();
+        const bkIdStr = String(p.businessKoroId).toLowerCase();
+
+        if (!deletedSet.has(idStr) && !deletedSet.has(slugStr) && !deletedSet.has(bkIdStr)) {
+          productKeys.add(slugStr || idStr);
         }
       }
     }
 
-    if (db) {
-      const localProducts = await Product.find({ isDeleted: { $ne: true } }).lean();
-      if (localProducts && localProducts.length > 0) {
-        for (const p of localProducts) {
-          if (!deletedSet.has(String(p._id)) && !deletedSet.has(String(p.slug)) && !deletedSet.has(String(p.businessKoroId))) {
-            productKeys.add(p.slug || p._id);
-          }
+    const localProducts = await Product.find({ isDeleted: { $ne: true } }).lean();
+    if (localProducts && localProducts.length > 0) {
+      for (const p of localProducts) {
+        const idStr = String(p._id).toLowerCase();
+        const slugStr = String(p.slug).toLowerCase();
+        const bkIdStr = String(p.businessKoroId || '').toLowerCase();
+
+        if (!deletedSet.has(idStr) && !deletedSet.has(slugStr) && !deletedSet.has(bkIdStr)) {
+          productKeys.add(slugStr || idStr);
         }
       }
-
-      const totalOrders = await Order.countDocuments();
-      const totalCategories = await Category.countDocuments();
-      const totalBanners = await Banner.countDocuments({ isActive: true });
-
-      const orders = await Order.find().lean();
-      const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-      const pendingOrders = orders.filter((o) => o.orderStatus === 'Placed' || o.orderStatus === 'Pending').length;
-      const processingOrders = orders.filter((o) => o.orderStatus === 'Processing').length;
-      const shippedOrders = orders.filter((o) => o.orderStatus === 'Shipped').length;
-      const deliveredOrders = orders.filter((o) => o.orderStatus === 'Delivered').length;
-
-      return NextResponse.json({
-        success: true,
-        stats: {
-          totalRevenue,
-          totalOrders,
-          totalProducts: productKeys.size,
-          totalCategories,
-          totalBanners,
-          pendingOrders,
-          processingOrders,
-          shippedOrders,
-          deliveredOrders,
-        },
-        source: 'mongodb',
-      });
     }
 
-    const orders = memoryStore?.orders || [];
-    const totalRevenue = orders.reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0);
-    const pendingOrders = orders.filter((o: any) => o.orderStatus === 'Placed' || o.orderStatus === 'Pending').length;
-    const processingOrders = orders.filter((o: any) => o.orderStatus === 'Processing').length;
-    const shippedOrders = orders.filter((o: any) => o.orderStatus === 'Shipped').length;
-    const deliveredOrders = orders.filter((o: any) => o.orderStatus === 'Delivered').length;
+    const [totalOrders, totalCategories, totalBanners, orders] = await Promise.all([
+      Order.countDocuments(),
+      Category.countDocuments(),
+      Banner.countDocuments({ isActive: true }),
+      Order.find().lean(),
+    ]);
+
+    const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const pendingOrders = orders.filter((o) => o.orderStatus === 'Placed' || (o.paymentStatus === 'Pending' && o.orderStatus !== 'Cancelled')).length;
+    const processingOrders = orders.filter((o) => o.orderStatus === 'Processing' || o.orderStatus === 'Confirmed').length;
+    const shippedOrders = orders.filter((o) => o.orderStatus === 'Shipped').length;
+    const deliveredOrders = orders.filter((o) => o.orderStatus === 'Delivered').length;
 
     return NextResponse.json({
       success: true,
       stats: {
         totalRevenue,
-        totalOrders: orders.length,
-        totalProducts: productKeys.size || (memoryStore?.products.length || 0),
-        totalCategories: memoryStore?.categories.length || 0,
-        totalBanners: memoryStore?.banners.length || 0,
+        totalOrders,
+        totalProducts: productKeys.size,
+        totalCategories,
+        totalBanners,
         pendingOrders,
         processingOrders,
         shippedOrders,
         deliveredOrders,
       },
-      source: 'memory',
+      source: 'mongodb',
     });
-  } catch (error: any) {
-    console.error('Error getting stats:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error getting stats:', err.message);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

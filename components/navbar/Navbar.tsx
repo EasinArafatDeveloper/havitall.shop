@@ -11,10 +11,15 @@ import {
   Menu, 
   X, 
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Flame,
+  Tag,
+  Gift,
+  BellRing
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import LiveSearchBar from '@/components/search/LiveSearchBar';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -23,11 +28,38 @@ export default function Navbar() {
   
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic Top Bar Offer State
+  const [topBarOffer, setTopBarOffer] = useState<{
+    _id?: string;
+    title?: string;
+    topBarText?: string;
+    topBarHighlight?: string;
+    topBarSuffix?: string;
+    topBarLink?: string;
+    topBarTheme?: string;
+    topBarIcon?: string;
+    isActive?: boolean;
+  } | null>(null);
+  const [isTopBarDismissed, setIsTopBarDismissed] = useState(false);
+
+  useEffect(() => {
+    async function loadTopBar() {
+      try {
+        const res = await fetch('/api/offers?topBarOnly=true');
+        const data = await res.json();
+        if (data.success && data.offers && data.offers.length > 0) {
+          const active = data.offers.find((o: any) => o.isActive !== false);
+          if (active) {
+            setTopBarOffer(active);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load top bar offer:', err);
+      }
+    }
+    loadTopBar();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -37,52 +69,6 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close search dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setShowSearchDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Live search debounce
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      setShowSearchDropdown(false);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const res = await fetch(`/api/products?search=${encodeURIComponent(searchQuery)}&limit=5`);
-        const data = await res.json();
-        if (data.success) {
-          setSearchResults(data.products || []);
-          setShowSearchDropdown(true);
-        }
-      } catch (err) {
-        console.error('Search error:', err);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      setShowSearchDropdown(false);
-      router.push(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
-
   const navLinks = [
     { name: 'Home', href: '/' },
     { name: 'All Collection', href: '/shop' },
@@ -90,13 +76,105 @@ export default function Navbar() {
     { name: 'Track Order', href: '/track-order' },
   ];
 
+  const getThemeClasses = (theme?: string) => {
+    switch (theme) {
+      case 'crimson':
+        return {
+          wrapper: 'bg-rose-950 text-rose-100 border-b border-rose-800/80',
+          highlight: 'text-rose-300 underline decoration-rose-400 font-bold',
+          icon: 'text-rose-400',
+        };
+      case 'emerald':
+        return {
+          wrapper: 'bg-emerald-950 text-emerald-100 border-b border-emerald-800/80',
+          highlight: 'text-emerald-300 underline decoration-emerald-400 font-bold',
+          icon: 'text-emerald-400',
+        };
+      case 'indigo':
+        return {
+          wrapper: 'bg-indigo-950 text-indigo-100 border-b border-indigo-800/80',
+          highlight: 'text-indigo-300 underline decoration-indigo-400 font-bold',
+          icon: 'text-indigo-400',
+        };
+      case 'neon_gradient':
+        return {
+          wrapper: 'bg-gradient-to-r from-rose-600 via-purple-600 to-amber-500 text-white shadow-xs',
+          highlight: 'bg-white/20 px-2 py-0.5 rounded text-white font-bold',
+          icon: 'text-amber-200',
+        };
+      case 'black':
+        return {
+          wrapper: 'bg-zinc-950 text-zinc-200 border-b border-zinc-800',
+          highlight: 'text-white underline decoration-zinc-400 font-bold',
+          icon: 'text-zinc-400',
+        };
+      case 'dark_gold':
+      default:
+        return {
+          wrapper: 'bg-slate-900 text-slate-200 border-b border-slate-800',
+          highlight: 'text-amber-400 underline decoration-amber-400 font-bold',
+          icon: 'text-amber-400',
+        };
+    }
+  };
+
+  const renderTopBarIcon = (iconName?: string) => {
+    const cls = 'w-3.5 h-3.5 shrink-0';
+    switch (iconName) {
+      case 'flame':
+        return <Flame className={`${cls} animate-pulse`} />;
+      case 'tag':
+        return <Tag className={cls} />;
+      case 'truck':
+        return <Truck className={cls} />;
+      case 'gift':
+        return <Gift className={cls} />;
+      case 'bell':
+        return <BellRing className={`${cls} animate-bounce`} />;
+      case 'sparkles':
+      default:
+        return <Sparkles className={`${cls} animate-spin-slow`} />;
+    }
+  };
+
+  const themeStyle = getThemeClasses(topBarOffer?.topBarTheme);
+
   return (
     <>
       {/* Top Announcement Bar */}
-      <div className="bg-slate-900 border-b border-slate-800 text-xs py-2 px-4 text-center text-slate-200 flex items-center justify-center gap-2 font-medium">
-        <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin-slow shrink-0" />
-        <span>Grand Launch: Use code <strong className="text-white underline decoration-amber-400">HAVITALL20</strong> for 20% OFF | Free Shipping over ৳1,500</span>
-      </div>
+      {!isTopBarDismissed && (topBarOffer?.isActive !== false) && (
+        <div className={`relative text-xs py-2 px-4 transition-all duration-300 ${themeStyle.wrapper}`}>
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 font-medium text-center">
+            <span className={themeStyle.icon}>
+              {renderTopBarIcon(topBarOffer?.topBarIcon)}
+            </span>
+            
+            {topBarOffer?.topBarLink ? (
+              <Link 
+                href={topBarOffer.topBarLink}
+                className="hover:opacity-90 inline-flex items-center gap-1.5 transition-opacity group"
+              >
+                <span>
+                  {topBarOffer.topBarText || 'Grand Launch: Use code'}{' '}
+                  <span className={themeStyle.highlight}>
+                    {topBarOffer.topBarHighlight || 'HAVITALL20 for 20% OFF'}
+                  </span>{' '}
+                  {topBarOffer.topBarSuffix || '| Free Shipping over ৳1,500'}
+                </span>
+                <ArrowRight className="w-3 h-3 opacity-70 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            ) : (
+              <span>
+                {topBarOffer?.topBarText || 'Grand Launch: Use code'}{' '}
+                <span className={themeStyle.highlight}>
+                  {topBarOffer?.topBarHighlight || 'HAVITALL20 for 20% OFF'}
+                </span>{' '}
+                {topBarOffer?.topBarSuffix || '| Free Shipping over ৳1,500'}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Navbar */}
       <header
@@ -142,70 +220,9 @@ export default function Navbar() {
             })}
           </nav>
 
-          {/* Search Bar with Live Dropdown */}
-          <div ref={searchRef} className="relative hidden md:block flex-1 max-w-xs lg:max-w-sm">
-            <form onSubmit={handleSearchSubmit} className="relative">
-              <input
-                type="text"
-                placeholder="Search luxury products, gadgets, audio..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => searchQuery && setShowSearchDropdown(true)}
-                className="w-full bg-slate-100 border border-slate-200 rounded-full py-2 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition-all shadow-inner"
-              />
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            </form>
-
-            {/* Live Search Results Dropdown */}
-            <AnimatePresence>
-              {showSearchDropdown && searchResults.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50 overflow-hidden"
-                >
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 px-3 py-1.5 border-b border-slate-100">
-                    Search Results ({searchResults.length})
-                  </div>
-                  <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-                    {searchResults.map((item) => (
-                      <Link
-                        key={item._id || item.slug}
-                        href={`/product/${item.slug || item._id}`}
-                        onClick={() => setShowSearchDropdown(false)}
-                        className="flex items-center gap-3 p-2.5 hover:bg-slate-50 rounded-xl transition-colors group"
-                      >
-                        <img
-                          src={item.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=200'}
-                          alt={item.name}
-                          className="w-12 h-12 object-cover rounded-lg bg-slate-100 shrink-0 border border-slate-100"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-slate-800 group-hover:text-rose-600 truncate">
-                            {item.name}
-                          </p>
-                          <p className="text-xs text-rose-600 font-bold mt-0.5">
-                            ৳{item.price?.toLocaleString()}
-                            {item.originalPrice && (
-                              <span className="text-slate-400 line-through ml-1.5 font-normal text-[11px]">
-                                ৳{item.originalPrice?.toLocaleString()}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                  <button
-                    onClick={handleSearchSubmit}
-                    className="w-full text-center text-xs text-rose-600 hover:text-rose-700 font-semibold py-2 border-t border-slate-100 mt-1 flex items-center justify-center gap-1"
-                  >
-                    View all results <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+          {/* Search Bar with Live Suggestions Dropdown */}
+          <div className="hidden md:block flex-1 max-w-xs lg:max-w-md">
+            <LiveSearchBar variant="navbar" placeholder="Search luxury products, earbuds, watches..." />
           </div>
 
           {/* Action Buttons */}
@@ -273,17 +290,14 @@ export default function Navbar() {
               exit={{ height: 0, opacity: 0 }}
               className="lg:hidden bg-white border-b border-slate-200 px-4 pt-3 pb-6 mt-3 space-y-4 shadow-lg"
             >
-              {/* Mobile Search Input */}
-              <form onSubmit={handleSearchSubmit} className="relative">
-                <input
-                  type="text"
+              {/* Mobile Live Search Bar */}
+              <div className="w-full">
+                <LiveSearchBar 
+                  variant="mobile" 
                   placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-100 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-slate-400"
+                  onNavigate={() => setIsMobileMenuOpen(false)}
                 />
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              </form>
+              </div>
 
               <nav className="flex flex-col space-y-1">
                 {navLinks.map((link) => (

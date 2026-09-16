@@ -3,7 +3,6 @@ import HeroSlider from '@/components/hero/HeroSlider';
 import FeaturedCollections from '@/components/home/FeaturedCollections';
 import HotProductsSection from '@/components/home/HotProductsSection';
 import DealOfTheDay from '@/components/home/DealOfTheDay';
-import { memoryStore } from '@/lib/memoryStore';
 import connectToDatabase from '@/lib/mongodb';
 import Product from '@/lib/models/Product';
 import Category from '@/lib/models/Category';
@@ -18,17 +17,18 @@ export const revalidate = 0;
 
 async function getData() {
   const productMap = new Map<string, any>();
-  const deletedSet = new Set<string>((memoryStore?.deletedProductIds || []).map((s) => String(s).toLowerCase().trim()));
-  const featuredSet = new Set<string>((memoryStore?.featuredProductIds || []).map((s) => String(s).toLowerCase().trim()));
-  const hotSet = new Set<string>((memoryStore?.hotProductIds || []).map((s) => String(s).toLowerCase().trim()));
+  const deletedSet = new Set<string>();
+  const featuredSet = new Set<string>();
+  const hotSet = new Set<string>();
   let categories: any[] = [];
   let banners: any[] = [];
   let offers: any[] = [];
 
+  const db = await connectToDatabase();
+
   // 1. Fetch deleted and featured identifiers from MongoDB
-  try {
-    const db = await connectToDatabase();
-    if (db) {
+  if (db) {
+    try {
       const [deletedRecords, featuredRecords] = await Promise.all([
         DeletedProduct.find().lean(),
         FeaturedProduct.find().lean(),
@@ -42,7 +42,9 @@ async function getData() {
 
       if (featuredRecords && featuredRecords.length > 0) {
         featuredRecords.forEach((f: any) => {
-          const keys = [f.identifier, f.slug, f.name, f.businessKoroId].filter(Boolean).map((s) => String(s).toLowerCase().trim());
+          const keys = [f.identifier, f.slug, f.name, f.businessKoroId]
+            .filter(Boolean)
+            .map((s) => String(s).toLowerCase().trim());
           if (f.isFeatured) {
             keys.forEach((k) => featuredSet.add(k));
           } else if (f.isFeatured === false) {
@@ -55,27 +57,33 @@ async function getData() {
           }
         });
       }
+    } catch (e) {
+      console.warn('DeletedProduct/FeaturedProduct check in page.tsx:', e);
     }
-  } catch (e) {
-    console.warn('DeletedProduct/FeaturedProduct check in page.tsx:', e);
   }
 
   const checkIsDeleted = (p: any) => {
-    const keys = [p._id, p.slug, p.businessKoroId, p.name].filter(Boolean).map((s) => String(s).toLowerCase().trim());
-    return keys.some((k) => deletedSet.has(k));
+    const keys = [p._id, p.slug, p.businessKoroId, p.name]
+      .filter(Boolean)
+      .map((s) => String(s).toLowerCase().trim());
+    return keys.some((k) => deletedSet.has(k)) || Boolean(p.isDeleted);
   };
 
   const checkIsFeatured = (p: any) => {
-    const keys = [p._id, p.slug, p.businessKoroId, p.name].filter(Boolean).map((s) => String(s).toLowerCase().trim());
+    const keys = [p._id, p.slug, p.businessKoroId, p.name]
+      .filter(Boolean)
+      .map((s) => String(s).toLowerCase().trim());
     return keys.some((k) => featuredSet.has(k)) || Boolean(p.isFeatured);
   };
 
   const checkIsHot = (p: any) => {
-    const keys = [p._id, p.slug, p.businessKoroId, p.name].filter(Boolean).map((s) => String(s).toLowerCase().trim());
+    const keys = [p._id, p.slug, p.businessKoroId, p.name]
+      .filter(Boolean)
+      .map((s) => String(s).toLowerCase().trim());
     return keys.some((k) => hotSet.has(k)) || Boolean(p.isHot);
   };
 
-  // 2. Fetch live products from Business Koro
+  // 2. Fetch live products from Business Koro API
   const bkProducts = await fetchBusinessKoroProducts();
   if (bkProducts && bkProducts.length > 0) {
     for (const p of bkProducts) {
@@ -91,13 +99,14 @@ async function getData() {
   }
 
   // 3. Fetch local products, banners, categories, and offers from MongoDB
-  try {
-    const db = await connectToDatabase();
-    if (db) {
-      const localProducts = await Product.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
-      const localCategories = await Category.find().lean();
-      const localBanners = await Banner.find({ isActive: true }).sort({ order: 1, createdAt: -1 }).lean();
-      const localOffers = await Offer.find({ isActive: true }).sort({ order: 1, updatedAt: -1 }).limit(2).lean();
+  if (db) {
+    try {
+      const [localProducts, localCategories, localBanners, localOffers] = await Promise.all([
+        Product.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean(),
+        Category.find().lean(),
+        Banner.find({ isActive: true }).sort({ order: 1, createdAt: -1 }).lean(),
+        Offer.find({ isActive: true, $or: [{ offerType: 'flash_deal' }, { offerType: { $exists: false } }] }).sort({ order: 1, updatedAt: -1 }).limit(2).lean(),
+      ]);
 
       if (localProducts && localProducts.length > 0) {
         for (const p of JSON.parse(JSON.stringify(localProducts))) {
@@ -108,7 +117,7 @@ async function getData() {
           const isFeat = checkIsFeatured(p);
           const isH = checkIsHot(p);
 
-          const merged = { ...p, isFeatured: isFeat, isHot: isH };
+          const merged = { ...p, _id: String(p._id), isFeatured: isFeat, isHot: isH };
 
           if (productMap.has(key)) {
             productMap.set(key, { ...productMap.get(key), ...merged });
@@ -126,30 +135,9 @@ async function getData() {
       if (localOffers) {
         offers = JSON.parse(JSON.stringify(localOffers));
       }
+    } catch (e) {
+      console.error('Database query in page.tsx:', e);
     }
-  } catch (e) {
-    console.error('Database query in page.tsx:', e);
-  }
-
-  // 4. Fallback to memory store if local DB not available
-  if (productMap.size === 0 && memoryStore?.products) {
-    for (const p of memoryStore.products) {
-      if (!checkIsDeleted(p)) {
-        const isFeat = checkIsFeatured(p);
-        const isH = checkIsHot(p);
-
-        productMap.set(p.slug || p._id || p.businessKoroId, { ...p, isFeatured: isFeat, isHot: isH });
-      }
-    }
-  }
-  if (categories.length === 0 && memoryStore?.categories) {
-    categories = memoryStore.categories;
-  }
-  if (banners.length === 0 && memoryStore?.banners) {
-    banners = memoryStore.banners.filter((b: any) => b.isActive);
-  }
-  if (offers.length === 0 && memoryStore?.offers) {
-    offers = memoryStore.offers.filter((o: any) => o.isActive).slice(0, 2);
   }
 
   const products = Array.from(productMap.values());
@@ -163,7 +151,7 @@ async function getData() {
 }
 
 export default async function HomePage() {
-  const { products, categories, banners, offers } = await getData();
+  const { products, banners, offers } = await getData();
 
   return (
     <div className="flex flex-col min-h-screen">

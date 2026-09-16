@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Category from '@/lib/models/Category';
-import { memoryStore } from '@/lib/memoryStore';
+import { verifyAdminSession } from '@/lib/auth';
 
 export async function GET() {
   try {
@@ -11,24 +11,26 @@ export async function GET() {
       return NextResponse.json({ success: true, categories: categories || [], source: 'mongodb' });
     }
 
-    return NextResponse.json({
-      success: true,
-      categories: memoryStore?.categories || [],
-      source: 'memory',
-    });
-  } catch (error: any) {
-    console.error('Error fetching categories:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Database service unavailable' }, { status: 503 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error fetching categories:', err.message);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
+  const session = verifyAdminSession(request);
+  if (!session.authenticated) {
+    return NextResponse.json({ success: false, error: 'Unauthorized. Admin access required.' }, { status: 401 });
+  }
+
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { name, image, icon, description } = body;
 
-    if (!name) {
-      return NextResponse.json({ success: false, error: 'Category name is required' }, { status: 400 });
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return NextResponse.json({ success: false, error: 'Valid category name is required' }, { status: 400 });
     }
 
     const slug =
@@ -39,9 +41,9 @@ export async function POST(request: Request) {
         .replace(/(^-|-$)/g, '');
 
     const newCatData = {
-      name,
-      slug,
-      description: description || `Shop exclusive ${name} collection`,
+      name: name.trim(),
+      slug: slug.trim().toLowerCase(),
+      description: description ? String(description).trim() : `Shop exclusive ${name.trim()} collection`,
       image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000',
       icon: icon || 'Tag',
       featured: body.featured ?? true,
@@ -49,26 +51,30 @@ export async function POST(request: Request) {
     };
 
     const db = await connectToDatabase();
-    if (db) {
-      const cat = await Category.create(newCatData);
-      memoryStore?.categories.push(cat.toObject());
-      return NextResponse.json({ success: true, category: cat, source: 'mongodb' });
+    if (!db) {
+      return NextResponse.json({ success: false, error: 'Database service unavailable' }, { status: 503 });
     }
 
-    const memCat = {
-      ...newCatData,
-      _id: `cat_${Date.now()}`,
-    };
-    memoryStore?.categories.push(memCat);
+    const cat = await Category.findOneAndUpdate(
+      { slug: newCatData.slug },
+      { $set: newCatData },
+      { upsert: true, new: true }
+    );
 
-    return NextResponse.json({ success: true, category: memCat, source: 'memory' });
-  } catch (error: any) {
-    console.error('Error creating category:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, category: cat, source: 'mongodb' });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error creating category:', err.message);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
+  const session = verifyAdminSession(request);
+  if (!session.authenticated) {
+    return NextResponse.json({ success: false, error: 'Unauthorized. Admin access required.' }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -78,23 +84,20 @@ export async function DELETE(request: Request) {
     }
 
     const db = await connectToDatabase();
-    if (db) {
-      if (id.match(/^[0-9a-fA-F]{24}$/)) {
-        await Category.findByIdAndDelete(id);
-      } else {
-        await Category.findOneAndDelete({ $or: [{ slug: id }, { name: id }, { _id: id }] });
-      }
+    if (!db) {
+      return NextResponse.json({ success: false, error: 'Database service unavailable' }, { status: 503 });
     }
 
-    if (memoryStore) {
-      memoryStore.categories = memoryStore.categories.filter(
-        (c) => c._id !== id && c.slug !== id && c.name !== id
-      );
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      await Category.findByIdAndDelete(id);
+    } else {
+      await Category.findOneAndDelete({ $or: [{ slug: id.toLowerCase() }, { name: id }] });
     }
 
     return NextResponse.json({ success: true, message: 'Category deleted' });
-  } catch (error: any) {
-    console.error('Error deleting category:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error deleting category:', err.message);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

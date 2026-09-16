@@ -13,31 +13,48 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // If already logged in, redirect to admin dashboard
+  // If already authenticated via server session, redirect to admin
   useEffect(() => {
-    const isAuth = localStorage.getItem('havitall_admin_auth');
-    if (isAuth === 'authenticated') {
-      router.replace('/admin');
-    }
+    fetch('/api/admin/me')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.authenticated) {
+          router.replace('/admin');
+        }
+      })
+      .catch(() => {});
   }, [router]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!username.trim() || !password.trim()) {
+      error('Please enter both Admin ID and Password');
+      return;
+    }
+
     setLoading(true);
 
-    const validUsernames = ['admin', 'havitall'];
-    const validPasswords = ['7zHWqYgc7C2nqA6i', 'admin123', 'havitall123'];
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: username.trim(),
+          password: password.trim(),
+        }),
+      });
 
-    if (
-      validUsernames.includes(username.trim().toLowerCase()) &&
-      validPasswords.includes(password.trim())
-    ) {
-      localStorage.setItem('havitall_admin_auth', 'authenticated');
-      document.cookie = 'havitall_admin_auth=authenticated; path=/; max-age=86400';
-      success('Welcome to HavItAll Admin Control Hub! 🛡️');
-      router.replace('/admin');
-    } else {
-      error('Invalid Admin Username or Password.');
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        success('Welcome to HavItAll Admin Control Hub! 🛡️');
+        router.replace('/admin');
+      } else {
+        error(data.error || 'Invalid Admin Username or Password.');
+      }
+    } catch {
+      error('Unable to connect to authentication server. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
@@ -74,7 +91,8 @@ export default function AdminLoginPage() {
               <input
                 type="text"
                 required
-                placeholder="e.g. havitall or admin"
+                autoComplete="username"
+                placeholder="e.g. admin or havitall"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-950 focus:bg-white"
@@ -85,13 +103,14 @@ export default function AdminLoginPage() {
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700">
-              Security Password
+              Security Password / PIN
             </label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
-                placeholder="Enter password"
+                autoComplete="current-password"
+                placeholder="Enter password or PIN"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-10 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-950 focus:bg-white"
@@ -125,7 +144,7 @@ export default function AdminLoginPage() {
         </form>
 
         <div className="pt-2 text-center text-[11px] text-slate-400 border-t border-slate-100">
-          <span>Protected by 256-bit encrypted session authentication</span>
+          <span>Protected by 256-bit encrypted HTTP-only session tokens</span>
         </div>
       </div>
     </div>

@@ -3,8 +3,8 @@ import connectToDatabase from '@/lib/mongodb';
 import Product from '@/lib/models/Product';
 import DeletedProduct from '@/lib/models/DeletedProduct';
 import FeaturedProduct from '@/lib/models/FeaturedProduct';
-import { memoryStore } from '@/lib/memoryStore';
 import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
+import { verifyAdminSession } from '@/lib/auth';
 
 export async function GET(request: Request) {
   try {
@@ -14,17 +14,18 @@ export async function GET(request: Request) {
     const isHot = searchParams.get('isHot');
     const isFeatured = searchParams.get('isFeatured');
     const sort = searchParams.get('sort') || 'newest';
-    const limit = parseInt(searchParams.get('limit') || '100');
+    const limit = parseInt(searchParams.get('limit') || '100', 10);
 
     const productMap = new Map<string, any>();
-    const deletedSet = new Set<string>((memoryStore?.deletedProductIds || []).map((s) => String(s).toLowerCase().trim()));
-    const featuredSet = new Set<string>((memoryStore?.featuredProductIds || []).map((s) => String(s).toLowerCase().trim()));
-    const hotSet = new Set<string>((memoryStore?.hotProductIds || []).map((s) => String(s).toLowerCase().trim()));
+    const deletedSet = new Set<string>();
+    const featuredSet = new Set<string>();
+    const hotSet = new Set<string>();
 
-    // 1. Fetch deleted and featured records from MongoDB
-    try {
-      const db = await connectToDatabase();
-      if (db) {
+    const db = await connectToDatabase();
+
+    // 1. Fetch deleted & featured flags from MongoDB
+    if (db) {
+      try {
         const [deletedRecords, featuredRecords] = await Promise.all([
           DeletedProduct.find().lean(),
           FeaturedProduct.find().lean(),
@@ -38,7 +39,9 @@ export async function GET(request: Request) {
 
         if (featuredRecords && featuredRecords.length > 0) {
           featuredRecords.forEach((f: any) => {
-            const keys = [f.identifier, f.slug, f.name, f.businessKoroId].filter(Boolean).map((s) => String(s).toLowerCase().trim());
+            const keys = [f.identifier, f.slug, f.name, f.businessKoroId]
+              .filter(Boolean)
+              .map((s) => String(s).toLowerCase().trim());
             if (f.isFeatured) {
               keys.forEach((k) => featuredSet.add(k));
             } else if (f.isFeatured === false) {
@@ -51,23 +54,29 @@ export async function GET(request: Request) {
             }
           });
         }
+      } catch (e) {
+        console.warn('DB query warning for deleted/featured products:', e);
       }
-    } catch (e) {
-      console.warn('DB query warning in products route:', e);
     }
 
     const checkIsDeleted = (p: any) => {
-      const keys = [p._id, p.slug, p.businessKoroId, p.name].filter(Boolean).map((s) => String(s).toLowerCase().trim());
-      return keys.some((k) => deletedSet.has(k));
+      const keys = [p._id, p.slug, p.businessKoroId, p.name]
+        .filter(Boolean)
+        .map((s) => String(s).toLowerCase().trim());
+      return keys.some((k) => deletedSet.has(k)) || Boolean(p.isDeleted);
     };
 
     const checkIsFeatured = (p: any) => {
-      const keys = [p._id, p.slug, p.businessKoroId, p.name].filter(Boolean).map((s) => String(s).toLowerCase().trim());
+      const keys = [p._id, p.slug, p.businessKoroId, p.name]
+        .filter(Boolean)
+        .map((s) => String(s).toLowerCase().trim());
       return keys.some((k) => featuredSet.has(k)) || Boolean(p.isFeatured);
     };
 
     const checkIsHot = (p: any) => {
-      const keys = [p._id, p.slug, p.businessKoroId, p.name].filter(Boolean).map((s) => String(s).toLowerCase().trim());
+      const keys = [p._id, p.slug, p.businessKoroId, p.name]
+        .filter(Boolean)
+        .map((s) => String(s).toLowerCase().trim());
       return keys.some((k) => hotSet.has(k)) || Boolean(p.isHot);
     };
 
@@ -75,7 +84,7 @@ export async function GET(request: Request) {
     const bkProducts = await fetchBusinessKoroProducts();
     if (bkProducts && bkProducts.length > 0) {
       for (const p of bkProducts) {
-        const key = p.slug || p._id || p.businessKoroId;
+        const key = (p.slug || p._id || p.businessKoroId).toLowerCase();
         if (checkIsDeleted(p)) {
           continue;
         }
@@ -87,47 +96,50 @@ export async function GET(request: Request) {
       }
     }
 
-    // 3. Fetch locally saved/updated products from MongoDB
-    try {
-      const db = await connectToDatabase();
-      if (db) {
-        const localProducts = await Product.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
+    // 3. Fetch local database products from MongoDB (overrides supplier data)
+    if (db) {
+      try {
+        const localProducts = await Product.find({ isDeleted: { $ne: true } })
+          .sort({ createdAt: -1 })
+          .lean();
+
         if (localProducts && localProducts.length > 0) {
           for (const p of localProducts) {
-            const key = p.slug || p._id || p.businessKoroId;
             if (checkIsDeleted(p)) {
               continue;
             }
 
             const isFeat = checkIsFeatured(p);
             const isH = checkIsHot(p);
+            const merged = { ...p, _id: String(p._id), isFeatured: isFeat, isHot: isH };
 
-            const merged = { ...p, isFeatured: isFeat, isHot: isH };
+            // Check if there is an existing matching entry in productMap (from Business Koro)
+            let matchedKey: string | null = null;
+            productMap.forEach((bkP, k) => {
+              if (
+                !matchedKey && (
+                  (p.businessKoroId && (bkP.businessKoroId === p.businessKoroId || bkP._id === p.businessKoroId)) ||
+                  (p.slug && (bkP.slug === p.slug || k === p.slug.toLowerCase())) ||
+                  (String(p._id) === String(bkP._id))
+                )
+              ) {
+                matchedKey = k;
+              }
+            });
 
-            if (productMap.has(key)) {
-              productMap.set(key, { ...productMap.get(key), ...merged });
+            if (matchedKey) {
+              const prev = productMap.get(matchedKey);
+              productMap.delete(matchedKey);
+              const newKey = (p.slug || String(p._id)).toLowerCase();
+              productMap.set(newKey, { ...prev, ...merged });
             } else {
+              const key = (p.slug || String(p._id) || p.businessKoroId).toLowerCase();
               productMap.set(key, merged);
             }
           }
         }
-      }
-    } catch (e) {
-      console.warn('MongoDB query fallback in products API:', e);
-    }
-
-    // 4. Memory store products (if any custom added in memory)
-    if (memoryStore?.products && memoryStore.products.length > 0) {
-      for (const p of memoryStore.products) {
-        const key = p.slug || p._id || p.businessKoroId;
-        if (!checkIsDeleted(p)) {
-          const isFeat = checkIsFeatured(p);
-          const isH = checkIsHot(p);
-
-          if (!productMap.has(key)) {
-            productMap.set(key, { ...p, isFeatured: isFeat, isHot: isH });
-          }
-        }
+      } catch (e) {
+        console.warn('MongoDB query warning in products API:', e);
       }
     }
 
@@ -145,44 +157,102 @@ export async function GET(request: Request) {
     if (isFeatured === 'true') {
       filtered = filtered.filter((p) => p.isFeatured);
     }
+    let matchingCategories: string[] = [];
+
     if (search) {
-      const s = search.toLowerCase();
-      filtered = filtered.filter(
-        (p) =>
-          p.name?.toLowerCase().includes(s) ||
-          p.description?.toLowerCase().includes(s) ||
-          p.tags?.some((t: string) => t.toLowerCase().includes(s))
+      const rawQuery = search.toLowerCase().trim();
+      const terms = rawQuery.split(/\s+/).filter(Boolean);
+
+      // Extract matching categories
+      const allCategories = Array.from(new Set(allProducts.map((p) => p.category).filter(Boolean)));
+      matchingCategories = allCategories.filter((cat) =>
+        cat.toLowerCase().includes(rawQuery) || terms.some((t) => cat.toLowerCase().includes(t))
       );
+
+      filtered = filtered
+        .map((p) => {
+          const name = (p.name || '').toLowerCase();
+          const desc = (p.description || '').toLowerCase();
+          const cat = (p.category || '').toLowerCase();
+          const brand = (p.brand || '').toLowerCase();
+          const tags = (p.tags || []).map((t: string) => t.toLowerCase());
+
+          // Check if all terms match
+          const allTermsMatch = terms.every(
+            (t) =>
+              name.includes(t) ||
+              desc.includes(t) ||
+              cat.includes(t) ||
+              brand.includes(t) ||
+              tags.some((tag: string) => tag.includes(t))
+          );
+
+          if (!allTermsMatch) return null;
+
+          // Score relevance
+          let score = 0;
+          if (name === rawQuery) score += 100;
+          else if (name.startsWith(rawQuery)) score += 50;
+          else if (name.includes(rawQuery)) score += 30;
+          
+          if (cat.includes(rawQuery)) score += 20;
+          if (brand.includes(rawQuery)) score += 15;
+          if (tags.some((t: string) => t.includes(rawQuery))) score += 10;
+          if (p.isHot) score += 5;
+          if (p.isFeatured) score += 5;
+
+          return { ...p, _searchScore: score };
+        })
+        .filter(Boolean) as any[];
+
+      // Sort by relevance score if no custom sort
+      if (!searchParams.get('sort')) {
+        filtered.sort((a, b) => (b._searchScore || 0) - (a._searchScore || 0));
+      }
     }
 
     // Apply sorting
     if (sort === 'price-low') filtered.sort((a, b) => a.price - b.price);
     else if (sort === 'price-high') filtered.sort((a, b) => b.price - a.price);
     else if (sort === 'rating') filtered.sort((a, b) => b.rating - a.rating);
-    else filtered.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    else if (!search) filtered.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
     return NextResponse.json({
       success: true,
       products: filtered.slice(0, limit),
+      matchingCategories,
       count: filtered.length,
-      source: bkProducts && bkProducts.length > 0 ? 'businesskoro' : 'local',
+      source: bkProducts && bkProducts.length > 0 ? 'businesskoro' : 'mongodb',
     });
-  } catch (error: any) {
-    console.error('Error fetching products:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error fetching products:', err.message);
+    return NextResponse.json({ success: false, error: 'Failed to fetch products' }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
+  // Protect with admin session
+  const session = verifyAdminSession(request);
+  if (!session.authenticated) {
+    return NextResponse.json({ success: false, error: 'Unauthorized. Admin access required.' }, { status: 401 });
+  }
+
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { name, price, category, description, images } = body;
 
-    if (!name || !price || !category || !description) {
-      return NextResponse.json(
-        { success: false, error: 'Name, price, category, and description are required' },
-        { status: 400 }
-      );
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return NextResponse.json({ success: false, error: 'Valid product name is required.' }, { status: 400 });
+    }
+
+    const numPrice = Number(price);
+    if (isNaN(numPrice) || numPrice < 0) {
+      return NextResponse.json({ success: false, error: 'Price must be a valid positive number.' }, { status: 400 });
+    }
+
+    if (!category || typeof category !== 'string') {
+      return NextResponse.json({ success: false, error: 'Valid category is required.' }, { status: 400 });
     }
 
     const slug =
@@ -192,40 +262,38 @@ export async function POST(request: Request) {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '') + `-${Date.now().toString().slice(-4)}`;
 
+    const originalPrice = body.originalPrice ? Number(body.originalPrice) : undefined;
+    const discountPercentage = originalPrice && originalPrice > numPrice
+      ? Math.round(((originalPrice - numPrice) / originalPrice) * 100)
+      : (Number(body.discountPercentage) || 0);
+
     const newProductData = {
       ...body,
-      slug,
-      images: images && images.length > 0 ? images : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'],
-      stock: Number(body.stock || 10),
-      price: Number(body.price),
-      originalPrice: body.originalPrice ? Number(body.originalPrice) : undefined,
-      discountPercentage: body.originalPrice && body.originalPrice > body.price
-        ? Math.round(((body.originalPrice - body.price) / body.originalPrice) * 100)
-        : (body.discountPercentage || 0),
+      name: name.trim(),
+      slug: slug.trim().toLowerCase(),
+      category: category.trim(),
+      description: description ? String(description).trim() : `${name.trim()} - Luxury lifestyle item.`,
+      images: Array.isArray(images) && images.length > 0 ? images : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'],
+      stock: Math.max(0, parseInt(String(body.stock || 10), 10)),
+      price: numPrice,
+      originalPrice,
+      discountPercentage,
       isDeleted: false,
-      isFeatured: body.isFeatured ?? false,
-      isHot: body.isHot ?? false,
+      isFeatured: Boolean(body.isFeatured),
+      isHot: Boolean(body.isHot),
+      source: 'local',
     };
 
     const db = await connectToDatabase();
-    if (db) {
-      const product = await Product.create(newProductData);
-      // Also update memory store
-      memoryStore?.products.unshift(product.toObject());
-      return NextResponse.json({ success: true, product, source: 'mongodb' });
+    if (!db) {
+      return NextResponse.json({ success: false, error: 'Database service unavailable.' }, { status: 503 });
     }
 
-    const memProduct = {
-      ...newProductData,
-      _id: `prod_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    memoryStore?.products.unshift(memProduct);
-
-    return NextResponse.json({ success: true, product: memProduct, source: 'memory' });
-  } catch (error: any) {
-    console.error('Error creating product:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    const product = await Product.create(newProductData);
+    return NextResponse.json({ success: true, product, source: 'mongodb' });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error creating product:', err.message);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
