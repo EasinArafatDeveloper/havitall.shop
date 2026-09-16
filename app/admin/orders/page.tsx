@@ -15,7 +15,11 @@ import {
   ExternalLink,
   Printer,
   Flame,
-  Trash2
+  Trash2,
+  Send,
+  AlertCircle,
+  RefreshCw,
+  Check
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 
@@ -23,10 +27,12 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [supplierFilter, setSupplierFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [customNote, setCustomNote] = useState('');
-  const { success, error } = useToast();
+  const [approvingIds, setApprovingIds] = useState<Record<string, boolean>>({});
+  const { success, error, info } = useToast();
 
   const loadOrders = async () => {
     try {
@@ -46,6 +52,42 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     loadOrders();
   }, []);
+
+  const handleApproveAndForward = async (orderId: string, orderNum: string) => {
+    if (!confirm(`আপনি কি অর্ডার #${orderNum} অনুমোদন করে Business Koro সাপ্লায়ারে পাঠাতে চান?`)) {
+      return;
+    }
+
+    try {
+      setApprovingIds((prev) => ({ ...prev, [orderId]: true }));
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'approve_and_forward',
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        if (data.supplierDispatched) {
+          success(`অর্ডার #${orderNum} সফলভাবে অনুমোদন করা হয়েছে এবং Business Koro সাপ্লায়ারে পাঠানো হয়েছে! 🎉`);
+        } else {
+          info(`অর্ডার #${orderNum} আপডেট হয়েছে: ${data.message || 'সাপ্লায়ার স্ট্যাটাস চেক করুন'}`);
+        }
+        loadOrders();
+        if (selectedOrder && (selectedOrder.orderNumber === orderId || selectedOrder._id === orderId)) {
+          setSelectedOrder(data.order);
+        }
+      } else {
+        error(data.error || 'অর্ডার অনুমোদন করতে ব্যর্থ হয়েছে।');
+      }
+    } catch (err: any) {
+      error('এরর: ' + err.message);
+    } finally {
+      setApprovingIds((prev) => ({ ...prev, [orderId]: false }));
+    }
+  };
 
   const handleUpdateStatus = async (orderId: string, newStatus: string, noteText?: string) => {
     try {
@@ -100,8 +142,14 @@ export default function AdminOrdersPage() {
     }
   };
 
+  const pendingApprovalCount = orders.filter(
+    (o) => !o.supplierStatus || o.supplierStatus === 'Pending Approval'
+  ).length;
+
   const filteredOrders = orders.filter((o) => {
     const matchesStatus = statusFilter === 'all' || o.orderStatus?.toLowerCase() === statusFilter.toLowerCase();
+    const currentSupplierStatus = o.supplierStatus || 'Pending Approval';
+    const matchesSupplier = supplierFilter === 'all' || currentSupplierStatus.toLowerCase() === supplierFilter.toLowerCase();
     const q = searchTerm.toLowerCase();
     const matchesSearch =
       !searchTerm ||
@@ -109,29 +157,54 @@ export default function AdminOrdersPage() {
       o.customer?.fullName?.toLowerCase().includes(q) ||
       o.customer?.phone?.includes(q) ||
       o.customer?.city?.toLowerCase().includes(q);
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesSupplier && matchesSearch;
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black font-display text-slate-950">
-            Orders Fulfillment & Management
-          </h1>
-          <p className="text-xs text-slate-500">
-            Track customer orders, print receipts, and manage courier shipment dispatching.
-          </p>
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-slate-950 text-white flex items-center justify-center font-bold shadow-sm">
+              <ShoppingBag className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black font-display text-slate-950">
+                Orders & Supplier Fulfillment
+              </h1>
+              <p className="text-xs text-slate-500">
+                গ্রাহকদের নতুন অর্ডার রিভিউ করুন, অনুমোদন দিয়ে সরাসরি Business Koro সাপ্লায়ারে পাঠান।
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {pendingApprovalCount > 0 && (
+            <div className="px-3.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+              <span>{pendingApprovalCount}টি অর্ডার অনুমোদনের অপেক্ষায়</span>
+            </div>
+          )}
+
+          <button
+            onClick={loadOrders}
+            disabled={loading}
+            className="p-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors cursor-pointer shadow-sm"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-3xl bg-white border border-slate-200 shadow-sm">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <input
             type="text"
-            placeholder="Search by Order ID, name, phone..."
+            placeholder="Search by Order ID, name, phone, city..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-950 focus:bg-white"
@@ -140,13 +213,34 @@ export default function AdminOrdersPage() {
         </div>
 
         {/* Status Filters */}
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {['all', 'Placed', 'Processing', 'Shipped', 'Delivered', 'Cancelled'].map((status) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Supplier Approval Filter Pill */}
+          <button
+            onClick={() => {
+              setSupplierFilter(supplierFilter === 'Pending Approval' ? 'all' : 'Pending Approval');
+              setStatusFilter('all');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              supplierFilter === 'Pending Approval'
+                ? 'bg-amber-400 text-slate-950 shadow-sm font-black'
+                : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>⏳ Awaiting Approval ({pendingApprovalCount})</span>
+          </button>
+
+          <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+
+          {['all', 'Placed', 'Confirmed', 'Processing', 'Shipped', 'Delivered', 'Cancelled'].map((status) => (
             <button
               key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${
-                statusFilter === status
+              onClick={() => {
+                setStatusFilter(status);
+                setSupplierFilter('all');
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
+                statusFilter === status && supplierFilter === 'all'
                   ? 'bg-slate-950 text-white shadow-sm'
                   : 'bg-slate-100 text-slate-600 hover:text-slate-950 border border-slate-200'
               }`}
@@ -162,29 +256,37 @@ export default function AdminOrdersPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
-                <th className="pb-3">Order Number</th>
-                <th className="pb-3">Customer Info</th>
-                <th className="pb-3">Items & Qty</th>
-                <th className="pb-3">Total</th>
-                <th className="pb-3">Payment</th>
-                <th className="pb-3">Status</th>
-                <th className="pb-3 text-right">Actions</th>
+              <tr className="border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold text-[10px]">
+                <th className="pb-3.5">Order Number</th>
+                <th className="pb-3.5">Customer Info</th>
+                <th className="pb-3.5">Items & Qty</th>
+                <th className="pb-3.5">Total Amount</th>
+                <th className="pb-3.5">Payment</th>
+                <th className="pb-3.5">Supplier Dispatch</th>
+                <th className="pb-3.5">Order Status</th>
+                <th className="pb-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
-                    No matching orders found.
+                  <td colSpan={8} className="py-10 text-center text-slate-400">
+                    <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <p className="font-bold text-slate-700">কোনো অর্ডার পাওয়া যায়নি</p>
                   </td>
                 </tr>
               ) : (
                 filteredOrders.map((order) => {
                   const hasOfferItem = order.items?.some((it: any) => it.isOffer);
+                  const orderKey = order.orderNumber || order._id;
+                  const isApproving = Boolean(approvingIds[orderKey]);
+                  const isPendingApproval = !order.supplierStatus || order.supplierStatus === 'Pending Approval';
+                  const isDispatched = order.supplierStatus === 'Dispatched to Supplier';
+
                   return (
                     <tr key={order._id || order.orderNumber} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3.5 font-mono font-bold text-slate-950">
+                      {/* Order Number */}
+                      <td className="py-4 font-mono font-bold text-slate-950">
                         <div className="flex items-center gap-1.5">
                           <span>{order.orderNumber}</span>
                           {hasOfferItem && (
@@ -194,26 +296,73 @@ export default function AdminOrdersPage() {
                             </span>
                           )}
                         </div>
+                        <span className="text-[10px] text-slate-400 block font-sans font-normal mt-0.5">
+                          {new Date(order.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </td>
-                      <td className="py-3.5">
+
+                      {/* Customer Info */}
+                      <td className="py-4">
                         <p className="font-bold text-slate-950">{order.customer?.fullName}</p>
                         <p className="text-[11px] text-slate-500">{order.customer?.phone} • {order.customer?.city}</p>
                       </td>
-                      <td className="py-3.5 text-slate-600">
-                        {order.items?.length || 1} item(s)
+
+                      {/* Items */}
+                      <td className="py-4 text-slate-600">
+                        <span className="font-semibold text-slate-800">{order.items?.length || 1} item(s)</span>
                       </td>
-                      <td className="py-3.5 font-bold text-slate-950 font-display">
+
+                      {/* Total */}
+                      <td className="py-4 font-bold text-slate-950 font-display">
                         ৳{order.totalAmount?.toLocaleString()}
                       </td>
-                      <td className="py-3.5">
+
+                      {/* Payment */}
+                      <td className="py-4">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-700">
                           {order.paymentMethod}
                         </span>
                       </td>
-                      <td className="py-3.5">
+
+                      {/* Supplier Status & Direct Approval Button */}
+                      <td className="py-4">
+                        {isDispatched ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Sent to Supplier</span>
+                          </span>
+                        ) : order.supplierStatus === 'Failed to Dispatch' ? (
+                          <div className="space-y-1">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold">
+                              <AlertCircle className="w-3 h-3 text-rose-600" />
+                              <span>Dispatch Failed</span>
+                            </span>
+                            <button
+                              onClick={() => handleApproveAndForward(orderKey, order.orderNumber)}
+                              disabled={isApproving}
+                              className="text-[10px] font-bold text-slate-900 underline block cursor-pointer"
+                            >
+                              Retry Send
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleApproveAndForward(orderKey, order.orderNumber)}
+                            disabled={isApproving}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-[11px] shadow-sm transform active:scale-95 transition-all cursor-pointer"
+                            title="Approve order and send to Business Koro supplier"
+                          >
+                            <Send className={`w-3 h-3 ${isApproving ? 'animate-spin' : ''}`} />
+                            <span>{isApproving ? 'Sending...' : 'Approve & Send'}</span>
+                          </button>
+                        )}
+                      </td>
+
+                      {/* Order Status Select */}
+                      <td className="py-4">
                         <select
                           value={order.orderStatus}
-                          onChange={(e) => handleUpdateStatus(order.orderNumber || order._id, e.target.value)}
+                          onChange={(e) => handleUpdateStatus(orderKey, e.target.value)}
                           className={`text-[11px] font-extrabold uppercase rounded-lg px-2.5 py-1 border focus:outline-none cursor-pointer ${
                             order.orderStatus === 'Delivered'
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -234,10 +383,12 @@ export default function AdminOrdersPage() {
                           <option value="Cancelled">Cancelled</option>
                         </select>
                       </td>
-                      <td className="py-3.5 text-right space-x-1.5">
+
+                      {/* Action Buttons */}
+                      <td className="py-4 text-right space-x-1.5">
                         <button
                           onClick={() => setSelectedOrder(order)}
-                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
                           title="View Full Details"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -251,8 +402,8 @@ export default function AdminOrdersPage() {
                           <ExternalLink className="w-3.5 h-3.5" />
                         </Link>
                         <button
-                          onClick={() => handleDeleteOrder(order.orderNumber || order._id, order.orderNumber)}
-                          className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors"
+                          onClick={() => handleDeleteOrder(orderKey, order.orderNumber)}
+                          className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors cursor-pointer"
                           title="Delete Order"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -283,14 +434,50 @@ export default function AdminOrdersPage() {
               </div>
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="text-slate-400 hover:text-slate-700 p-1"
+                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            {/* Supplier Approval Banner in Modal */}
+            <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              selectedOrder.supplierStatus === 'Dispatched to Supplier'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-amber-50 border-amber-200 text-amber-950'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <Truck className="w-5 h-5 text-slate-800" />
+                <div>
+                  <h4 className="text-xs font-bold">
+                    সাপ্লায়ার স্ট্যাটাস: {selectedOrder.supplierStatus || 'Pending Approval'}
+                  </h4>
+                  <p className="text-[11px] text-slate-600">
+                    {selectedOrder.supplierStatus === 'Dispatched to Supplier'
+                      ? 'অর্ডারটি Business Koro সাপ্লায়ার সিস্টেমে পাঠানো হয়েছে।'
+                      : 'অর্ডারটি এখনও সাপ্লায়ারে পাঠানো হয়নি। আপনি রিভিউ করে অনুমোদন দিন।'}
+                  </p>
+                </div>
+              </div>
+
+              {selectedOrder.supplierStatus !== 'Dispatched to Supplier' && (
+                <button
+                  onClick={() => handleApproveAndForward(selectedOrder.orderNumber || selectedOrder._id, selectedOrder.orderNumber)}
+                  disabled={Boolean(approvingIds[selectedOrder.orderNumber || selectedOrder._id])}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer shrink-0 transition-all"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>
+                    {approvingIds[selectedOrder.orderNumber || selectedOrder._id]
+                      ? 'Sending...'
+                      : 'Approve & Send to Supplier'}
+                  </span>
+                </button>
+              )}
+            </div>
+
             {/* Customer Info */}
-            <div className="grid grid-cols-2 gap-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
                 <span className="font-bold text-slate-500 uppercase text-[10px]">Customer</span>
                 <p className="font-bold text-slate-950 text-sm">{selectedOrder.customer?.fullName}</p>
@@ -368,7 +555,7 @@ export default function AdminOrdersPage() {
               />
               <button
                 type="submit"
-                className="px-4 py-2 bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-colors"
+                className="px-4 py-2 bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 Add Note
               </button>

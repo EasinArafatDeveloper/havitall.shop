@@ -31,6 +31,10 @@ export interface IOrder extends Document {
   paymentMethod: 'COD' | 'BKASH' | 'NAGAD' | 'CARD';
   paymentStatus: 'Pending' | 'Paid' | 'Failed';
   orderStatus: 'Placed' | 'Confirmed' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
+  supplierStatus?: 'Pending Approval' | 'Dispatched to Supplier' | 'Failed to Dispatch' | 'Manual Handling';
+  supplierResponse?: any;
+  approvedAt?: Date;
+  approvedBy?: string;
   timeline: {
     status: string;
     time: Date;
@@ -87,6 +91,14 @@ const OrderSchema = new Schema<IOrder>(
       enum: ['Placed', 'Confirmed', 'Processing', 'Shipped', 'Delivered', 'Cancelled'],
       default: 'Placed',
     },
+    supplierStatus: {
+      type: String,
+      enum: ['Pending Approval', 'Dispatched to Supplier', 'Failed to Dispatch', 'Manual Handling'],
+      default: 'Pending Approval',
+    },
+    supplierResponse: { type: Schema.Types.Mixed },
+    approvedAt: { type: Date },
+    approvedBy: { type: String },
     timeline: [
       {
         status: { type: String, required: true },

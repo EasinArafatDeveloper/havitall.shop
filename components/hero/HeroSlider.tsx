@@ -100,7 +100,7 @@ export default function HeroSlider({ initialBanners }: { initialBanners?: Banner
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-md border border-slate-200 bg-slate-100 aspect-square sm:aspect-[21/9] md:aspect-[24/9] min-h-[220px] sm:min-h-[340px] md:min-h-[420px] select-none group">
+        <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-md border border-slate-200 bg-slate-100 aspect-[21/9] md:aspect-[24/9] min-h-[140px] sm:min-h-[340px] md:min-h-[420px] select-none group">
           
           {/* Pure Poster Slide Container with Drag & Swipe Support */}
           <AnimatePresence initial={false} custom={direction}>
@@ -132,7 +132,7 @@ export default function HeroSlider({ initialBanners }: { initialBanners?: Banner
                 <img
                   src={current.image}
                   alt={current.title || 'Hero Poster'}
-                  className="w-full h-full object-contain sm:object-cover object-center pointer-events-none transition-transform duration-700 group-hover:scale-[1.015]"
+                  className="w-full h-full object-contain object-center pointer-events-none transition-transform duration-700 group-hover:scale-[1.015]"
                 />
                 
                 {/* Subtle luxury edge vignette */}

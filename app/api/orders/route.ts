@@ -191,32 +191,17 @@ export async function POST(request: Request) {
       paymentMethod: ['COD', 'BKASH', 'NAGAD', 'CARD'].includes(paymentMethod) ? paymentMethod : 'COD',
       paymentStatus: paymentMethod === 'COD' ? 'Pending' : 'Paid',
       orderStatus: 'Placed',
+      supplierStatus: 'Pending Approval',
       timeline: [
         {
           status: 'Placed',
           time: new Date(),
-          note: `Order verified and placed securely with ${paymentMethod}. Subtotal: ৳${calculatedSubtotal}, Delivery: ৳${calculatedShipping}`,
+          note: `Order placed securely with ${paymentMethod}. Awaiting store admin confirmation & supplier dispatch. Subtotal: ৳${calculatedSubtotal}, Delivery: ৳${calculatedShipping}`,
         },
       ],
     };
 
     const order = await Order.create(orderData);
-
-    // Forward order to Business Koro supplier fulfillment asynchronously
-    for (const item of verifiedItems) {
-      pushOrderToBusinessKoro({
-        productId: String(item.productId),
-        customerName: customer.fullName,
-        customerPhone: cleanPhone,
-        customerAddress: customer.address,
-        customerDivision: customer.city || 'Dhaka',
-        customerDistrict: customer.city || 'Dhaka',
-        customerArea: customer.city || 'Dhaka',
-        sellingPrice: item.price,
-        deliveryChargePaidByCustomer: calculatedShipping > 0,
-        customerNote: customer.note || `HavItAll Order ${orderNumber}`,
-      }).catch((err) => console.warn('Business Koro order dispatch notice:', err.message));
-    }
 
     return NextResponse.json({ success: true, order, source: 'mongodb' });
   } catch (error: unknown) {
