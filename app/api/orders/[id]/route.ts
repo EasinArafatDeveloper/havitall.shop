@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Order from '@/lib/models/Order';
+import Product from '@/lib/models/Product';
+import { pushOrderToBusinessKoro } from '@/lib/businessKoro';
 import { verifyAdminSession } from '@/lib/auth';
 
 export async function GET(
@@ -38,8 +40,6 @@ export async function GET(
   }
 }
 
-import { pushOrderToBusinessKoro } from '@/lib/businessKoro';
-
 export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
@@ -70,6 +70,18 @@ export async function PUT(
     // ACTION: APPROVE & FORWARD TO SUPPLIER (Business Koro)
     // ========================================================
     if (action === 'approve_and_forward') {
+      // If admin updated customer info during approval
+      if (body.customer) {
+        existingOrder.customer = {
+          fullName: body.customer.fullName || existingOrder.customer.fullName,
+          phone: body.customer.phone || existingOrder.customer.phone,
+          address: body.customer.address || existingOrder.customer.address,
+          city: body.customer.city || existingOrder.customer.city,
+          email: body.customer.email || existingOrder.customer.email,
+          note: body.customer.note !== undefined ? body.customer.note : existingOrder.customer.note,
+        };
+      }
+
       const items = existingOrder.items || [];
       const customer = existingOrder.customer || {};
       const orderNumber = existingOrder.orderNumber;
@@ -80,8 +92,22 @@ export async function PUT(
       let errorMessage = '';
 
       for (const item of items) {
+        let targetBkProductId = String(item.productId);
+        try {
+          const queryConditions: any[] = [{ slug: item.productId }, { businessKoroId: item.productId }, { name: item.name }];
+          if (typeof item.productId === 'string' && item.productId.match(/^[0-9a-fA-F]{24}$/)) {
+            queryConditions.unshift({ _id: item.productId });
+          }
+          const matchedProd = await Product.findOne({ $or: queryConditions }).lean();
+          if (matchedProd && (matchedProd as any).businessKoroId) {
+            targetBkProductId = (matchedProd as any).businessKoroId;
+          }
+        } catch (e) {
+          console.warn('Error resolving BK product ID:', e);
+        }
+
         const bkPayload = {
-          productId: String(item.productId),
+          productId: targetBkProductId,
           customerName: customer.fullName,
           customerPhone: cleanPhone,
           customerAddress: customer.address,
@@ -99,7 +125,13 @@ export async function PUT(
         if (result.success) {
           dispatchSuccess = true;
         } else {
-          errorMessage = result.error || 'Supplier API returned an error';
+          const bkMsg = result?.data?.message;
+          const msgStr = Array.isArray(bkMsg)
+            ? bkMsg.join(', ')
+            : typeof bkMsg === 'string'
+            ? bkMsg
+            : result.error || result?.data?.error || 'Supplier API error';
+          errorMessage = msgStr;
         }
       }
 
@@ -107,7 +139,7 @@ export async function PUT(
       const newOrderStatus = dispatchSuccess ? 'Confirmed' : existingOrder.orderStatus;
       const timelineNote = dispatchSuccess
         ? `✅ Order approved by Admin (${session.username || 'admin'}) and forwarded to Business Koro supplier for fulfillment.`
-        : `⚠️ Admin attempted approval, but supplier dispatch encountered an issue: ${errorMessage}`;
+        : `⚠️ Supplier dispatch notice: ${errorMessage}`;
 
       existingOrder.orderStatus = newOrderStatus;
       existingOrder.supplierStatus = newSupplierStatus;
@@ -128,7 +160,7 @@ export async function PUT(
         supplierDispatched: dispatchSuccess,
         message: dispatchSuccess
           ? 'Order approved and successfully forwarded to Business Koro supplier!'
-          : `Order marked, but supplier dispatch notice: ${errorMessage}`,
+          : `সাপ্লায়ার নোটিশ: ${errorMessage}`,
       });
     }
 

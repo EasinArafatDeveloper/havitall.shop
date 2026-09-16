@@ -19,6 +19,8 @@ import {
   Send,
   AlertCircle,
   RefreshCw,
+  Edit2,
+  Save,
   Check
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
@@ -32,6 +34,16 @@ export default function AdminOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [customNote, setCustomNote] = useState('');
   const [approvingIds, setApprovingIds] = useState<Record<string, boolean>>({});
+  
+  // Edit customer state inside modal
+  const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+  const [editCustomer, setEditCustomer] = useState({
+    fullName: '',
+    phone: '',
+    address: '',
+    city: 'Dhaka',
+  });
+
   const { success, error, info } = useToast();
 
   const loadOrders = async () => {
@@ -53,19 +65,29 @@ export default function AdminOrdersPage() {
     loadOrders();
   }, []);
 
-  const handleApproveAndForward = async (orderId: string, orderNum: string) => {
-    if (!confirm(`আপনি কি অর্ডার #${orderNum} অনুমোদন করে Business Koro সাপ্লায়ারে পাঠাতে চান?`)) {
-      return;
-    }
+  const openOrderModal = (order: any) => {
+    setSelectedOrder(order);
+    setIsEditingCustomer(false);
+    setEditCustomer({
+      fullName: order.customer?.fullName || '',
+      phone: order.customer?.phone || '',
+      address: order.customer?.address || '',
+      city: order.customer?.city || 'Dhaka',
+    });
+  };
 
+  const handleApproveAndForward = async (orderId: string, orderNum: string, updatedCustomerData?: any) => {
     try {
       setApprovingIds((prev) => ({ ...prev, [orderId]: true }));
+      const payload: any = { action: 'approve_and_forward' };
+      if (updatedCustomerData) {
+        payload.customer = updatedCustomerData;
+      }
+
       const res = await fetch(`/api/orders/${orderId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'approve_and_forward',
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -73,7 +95,7 @@ export default function AdminOrdersPage() {
         if (data.supplierDispatched) {
           success(`অর্ডার #${orderNum} সফলভাবে অনুমোদন করা হয়েছে এবং Business Koro সাপ্লায়ারে পাঠানো হয়েছে! 🎉`);
         } else {
-          info(`অর্ডার #${orderNum} আপডেট হয়েছে: ${data.message || 'সাপ্লায়ার স্ট্যাটাস চেক করুন'}`);
+          error(data.message || 'সাপ্লায়ার অর্ডার গ্রহণ করেনি। কাস্টমারের ফোন নাম্বার বা তথ্য চেক করুন।');
         }
         loadOrders();
         if (selectedOrder && (selectedOrder.orderNumber === orderId || selectedOrder._id === orderId)) {
@@ -159,6 +181,14 @@ export default function AdminOrdersPage() {
       o.customer?.city?.toLowerCase().includes(q);
     return matchesStatus && matchesSupplier && matchesSearch;
   });
+
+  const getSupplierErrorMessage = (order: any) => {
+    const lastTimeline = order?.timeline?.slice().reverse().find((t: any) => t.note?.includes('সাপ্লায়ার') || t.note?.includes('Supplier') || t.note?.includes('dispatch'));
+    if (lastTimeline?.note) return lastTimeline.note;
+    const resp = order?.supplierResponse?.[0]?.data;
+    if (resp?.message) return Array.isArray(resp.message) ? resp.message.join(', ') : resp.message;
+    return 'Customer mobile number must be an 11-digit Bangladeshi number (e.g. 01712345678).';
+  };
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -280,7 +310,6 @@ export default function AdminOrdersPage() {
                   const hasOfferItem = order.items?.some((it: any) => it.isOffer);
                   const orderKey = order.orderNumber || order._id;
                   const isApproving = Boolean(approvingIds[orderKey]);
-                  const isPendingApproval = !order.supplierStatus || order.supplierStatus === 'Pending Approval';
                   const isDispatched = order.supplierStatus === 'Dispatched to Supplier';
 
                   return (
@@ -338,11 +367,10 @@ export default function AdminOrdersPage() {
                               <span>Dispatch Failed</span>
                             </span>
                             <button
-                              onClick={() => handleApproveAndForward(orderKey, order.orderNumber)}
-                              disabled={isApproving}
+                              onClick={() => openOrderModal(order)}
                               className="text-[10px] font-bold text-slate-900 underline block cursor-pointer"
                             >
-                              Retry Send
+                              Edit Phone & Retry
                             </button>
                           </div>
                         ) : (
@@ -387,7 +415,7 @@ export default function AdminOrdersPage() {
                       {/* Action Buttons */}
                       <td className="py-4 text-right space-x-1.5">
                         <button
-                          onClick={() => setSelectedOrder(order)}
+                          onClick={() => openOrderModal(order)}
                           className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
                           title="View Full Details"
                         >
@@ -440,21 +468,25 @@ export default function AdminOrdersPage() {
               </button>
             </div>
 
-            {/* Supplier Approval Banner in Modal */}
+            {/* Supplier Approval / Failure Banner */}
             <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
               selectedOrder.supplierStatus === 'Dispatched to Supplier'
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : selectedOrder.supplierStatus === 'Failed to Dispatch'
+                ? 'bg-rose-50 border-rose-200 text-rose-950'
                 : 'bg-amber-50 border-amber-200 text-amber-950'
             }`}>
-              <div className="flex items-center gap-2.5">
-                <Truck className="w-5 h-5 text-slate-800" />
-                <div>
+              <div className="flex items-start gap-2.5">
+                <Truck className="w-5 h-5 text-slate-800 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
                   <h4 className="text-xs font-bold">
                     সাপ্লায়ার স্ট্যাটাস: {selectedOrder.supplierStatus || 'Pending Approval'}
                   </h4>
                   <p className="text-[11px] text-slate-600">
                     {selectedOrder.supplierStatus === 'Dispatched to Supplier'
-                      ? 'অর্ডারটি Business Koro সাপ্লায়ার সিস্টেমে পাঠানো হয়েছে।'
+                      ? 'অর্ডারটি Business Koro সাপ্লায়ার সিস্টেমে সফলভাবে পাঠানো হয়েছে।'
+                      : selectedOrder.supplierStatus === 'Failed to Dispatch'
+                      ? `⚠️ কারণ: ${getSupplierErrorMessage(selectedOrder)}`
                       : 'অর্ডারটি এখনও সাপ্লায়ারে পাঠানো হয়নি। আপনি রিভিউ করে অনুমোদন দিন।'}
                   </p>
                 </div>
@@ -462,7 +494,11 @@ export default function AdminOrdersPage() {
 
               {selectedOrder.supplierStatus !== 'Dispatched to Supplier' && (
                 <button
-                  onClick={() => handleApproveAndForward(selectedOrder.orderNumber || selectedOrder._id, selectedOrder.orderNumber)}
+                  onClick={() => handleApproveAndForward(
+                    selectedOrder.orderNumber || selectedOrder._id,
+                    selectedOrder.orderNumber,
+                    isEditingCustomer ? editCustomer : undefined
+                  )}
                   disabled={Boolean(approvingIds[selectedOrder.orderNumber || selectedOrder._id])}
                   className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer shrink-0 transition-all"
                 >
@@ -470,29 +506,86 @@ export default function AdminOrdersPage() {
                   <span>
                     {approvingIds[selectedOrder.orderNumber || selectedOrder._id]
                       ? 'Sending...'
+                      : selectedOrder.supplierStatus === 'Failed to Dispatch'
+                      ? 'Save & Re-dispatch'
                       : 'Approve & Send to Supplier'}
                   </span>
                 </button>
               )}
             </div>
 
-            {/* Customer Info */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                <span className="font-bold text-slate-500 uppercase text-[10px]">Customer</span>
-                <p className="font-bold text-slate-950 text-sm">{selectedOrder.customer?.fullName}</p>
-                <p className="text-slate-700">{selectedOrder.customer?.phone}</p>
-                {selectedOrder.customer?.email && <p className="text-slate-500">{selectedOrder.customer?.email}</p>}
+            {/* Customer Info & Edit Option */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-500 uppercase text-[10px]">Customer Details</span>
+                <button
+                  onClick={() => setIsEditingCustomer(!isEditingCustomer)}
+                  className="text-xs font-bold text-slate-900 hover:text-slate-600 flex items-center gap-1 cursor-pointer"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>{isEditingCustomer ? 'Cancel Edit' : 'Edit Customer Phone / Address'}</span>
+                </button>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                <span className="font-bold text-slate-500 uppercase text-[10px]">Shipping Address</span>
-                <p className="text-slate-800">{selectedOrder.customer?.address}</p>
-                <p className="text-slate-600 font-semibold">{selectedOrder.customer?.city}</p>
-                {selectedOrder.customer?.note && (
-                  <p className="text-amber-800 text-[11px] pt-1 font-medium">Note: {selectedOrder.customer?.note}</p>
-                )}
-              </div>
+              {isEditingCustomer ? (
+                <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Customer Name</label>
+                      <input
+                        type="text"
+                        value={editCustomer.fullName}
+                        onChange={(e) => setEditCustomer({ ...editCustomer, fullName: e.target.value })}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-semibold focus:outline-none focus:border-slate-950"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">
+                        Phone (১১ ডিজিট বাংলাদেশী নাম্বার) <span className="text-rose-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 01712345678"
+                        value={editCustomer.phone}
+                        onChange={(e) => setEditCustomer({ ...editCustomer, phone: e.target.value })}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-slate-950"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="font-bold text-slate-700 block mb-1">Delivery Address</label>
+                      <input
+                        type="text"
+                        value={editCustomer.address}
+                        onChange={(e) => setEditCustomer({ ...editCustomer, address: e.target.value })}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-950"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-amber-900 font-medium">
+                    💡 সঠিক ১১ ডিজিটের মোবাইল নাম্বার লিখে উপরে <strong>&quot;Save &amp; Re-dispatch&quot;</strong> বাটনে চাপ দিন।
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                    <span className="font-bold text-slate-500 uppercase text-[10px]">Customer</span>
+                    <p className="font-bold text-slate-950 text-sm">{selectedOrder.customer?.fullName}</p>
+                    <p className="text-slate-800 font-mono font-bold">{selectedOrder.customer?.phone}</p>
+                    {selectedOrder.customer?.email && <p className="text-slate-500">{selectedOrder.customer?.email}</p>}
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                    <span className="font-bold text-slate-500 uppercase text-[10px]">Shipping Address</span>
+                    <p className="text-slate-800">{selectedOrder.customer?.address}</p>
+                    <p className="text-slate-600 font-semibold">{selectedOrder.customer?.city}</p>
+                    {selectedOrder.customer?.note && (
+                      <p className="text-amber-800 text-[11px] pt-1 font-medium">Note: {selectedOrder.customer?.note}</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Items List */}

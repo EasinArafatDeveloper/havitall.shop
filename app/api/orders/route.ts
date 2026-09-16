@@ -53,11 +53,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate phone number length/format
-    const cleanPhone = customer.phone.replace(/[^0-9+]/g, '');
-    if (cleanPhone.length < 10 || cleanPhone.length > 15) {
+    // Validate phone number format (11-digit Bangladeshi mobile number)
+    const cleanPhone = customer.phone.replace(/[^0-9]/g, '');
+    if (!/^01[3-9]\d{8}$/.test(cleanPhone)) {
       return NextResponse.json(
-        { success: false, error: 'Please enter a valid phone number (10-15 digits).' },
+        { success: false, error: 'Customer phone must be a valid 11-digit Bangladeshi mobile number (e.g. 01712345678).' },
         { status: 400 }
       );
     }

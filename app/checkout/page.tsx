@@ -93,7 +93,13 @@ export default function CheckoutPage() {
     e.preventDefault();
 
     if (!formData.fullName.trim() || !formData.phone.trim() || !formData.address.trim()) {
-      error('Please fill in your name, phone number, and delivery address.');
+      error('দয়া করে আপনার নাম, মোবাইল নাম্বার এবং সম্পূর্ণ ঠিকানা লিখুন।');
+      return;
+    }
+
+    const cleanPhone = formData.phone.replace(/[^0-9]/g, '');
+    if (!/^01[3-9]\d{8}$/.test(cleanPhone)) {
+      error('দয়া করে সঠিক ১১ ডিজিটের মোবাইল নাম্বার দিন (যেমন: 01712345678)।');
       return;
     }
 
