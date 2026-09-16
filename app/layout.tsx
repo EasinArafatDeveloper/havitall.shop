@@ -91,7 +91,7 @@ const organizationJsonLd = {
   url: SITE_URL,
   logo: `${SITE_URL}/icon`,
   description: SITE_DESCRIPTION,
-  sameAs: [],
+  sameAs: ["https://www.facebook.com/havitall"],
 };
 
 const websiteJsonLd = {

@@ -2,12 +2,13 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { 
-  Send, 
-  Sparkles, 
-  MapPin, 
-  Phone, 
-  Mail
+import {
+  Send,
+  Sparkles,
+  MapPin,
+  Phone,
+  Mail,
+  Facebook
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 
@@ -71,6 +72,22 @@ export default function Footer() {
                   <Send className="w-3.5 h-3.5" />
                 </button>
               </form>
+            </div>
+
+            {/* Social Links */}
+            <div className="pt-2">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-2">
+                Follow Us
+              </span>
+              <a
+                href="https://www.facebook.com/havitall"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="HavItAll on Facebook"
+                className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-950 text-slate-700 hover:text-white border border-slate-200 transition-colors"
+              >
+                <Facebook className="w-4 h-4" />
+              </a>
             </div>
           </div>
 
