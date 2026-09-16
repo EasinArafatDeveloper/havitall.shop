@@ -69,9 +69,7 @@ export async function POST(request: Request) {
     });
 
     // Clear demo orders
-    await Order.deleteMany({
-      orderNumber: { $in: ['HAV-8092', 'HAV-8091'] },
-    });
+    await Order.deleteMany({});
 
     return NextResponse.json({
       success: true,
