@@ -113,6 +113,7 @@ export default function ProductCard({ product, onQuickView }: ProductCardProps) 
         <img
           src={isHovered && secondaryImage ? secondaryImage : primaryImage}
           alt={product.name}
+          referrerPolicy="no-referrer"
           className="h-full w-full object-contain p-2 transition-transform duration-700 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

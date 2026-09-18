@@ -178,6 +178,7 @@ export default function ProductDetailPage() {
                   <img
                     src={images[selectedImgIdx >= 0 ? selectedImgIdx : 0] || images[0]}
                     alt={product.name}
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-contain rounded-2xl transition-all duration-300"
                   />
                   {product.discountPercentage > 0 && (
@@ -202,7 +203,12 @@ export default function ProductDetailPage() {
                         : 'border-slate-200 opacity-65 hover:opacity-100'
                     }`}
                   >
-                    <img src={img} alt="" className="w-full h-full object-contain rounded-xl" />
+                    <img 
+                      src={img} 
+                      alt="" 
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-contain rounded-xl" 
+                    />
                   </button>
                 ))}
 

@@ -14,13 +14,15 @@ import {
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatImageUrl } from '@/lib/mediaUtils';
 
 interface QuickViewModalProps {
   product: any | null;
+  isOpen?: boolean;
   onClose: () => void;
 }
 
-export default function QuickViewModal({ product, onClose }: QuickViewModalProps) {
+export default function QuickViewModal({ product, isOpen = true, onClose }: QuickViewModalProps) {
   const { addToCart, toggleWishlist, isInWishlist } = useCart();
   const [selectedImageIdx, setSelectedImageIdx] = useState(0);
   const [selectedColor, setSelectedColor] = useState<string>('');
@@ -30,7 +32,8 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
   if (!product) return null;
 
   const inWishlist = isInWishlist(product._id || product.id || product.slug);
-  const images = product.images && product.images.length > 0 ? product.images : [product.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'];
+  const rawImages = product.images && product.images.length > 0 ? product.images : [product.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'];
+  const images = rawImages.map((img: string) => formatImageUrl(img));
   const colors = product.variants?.colors || [];
   const sizes = product.variants?.sizes || [];
 
@@ -80,6 +83,7 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
                 <img
                   src={images[selectedImageIdx] || images[0]}
                   alt={product.name}
+                  referrerPolicy="no-referrer"
                   className="w-full h-full object-contain"
                 />
                 {product.discountPercentage > 0 && (
@@ -102,7 +106,7 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
                           : 'border-slate-200 opacity-60 hover:opacity-100'
                       }`}
                     >
-                      <img src={img} alt="" className="w-full h-full object-contain" />
+                      <img src={img} alt="" referrerPolicy="no-referrer" className="w-full h-full object-contain" />
                     </button>
                   ))}
                 </div>
