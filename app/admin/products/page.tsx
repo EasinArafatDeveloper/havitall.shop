@@ -19,6 +19,7 @@ export default function AdminProductsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCat, setSelectedCat] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'featured' | 'hot'>('all');
   const { success, error, info } = useToast();
@@ -216,6 +217,12 @@ export default function AdminProductsPage() {
       error('Please fill in product name, price, and description');
       return;
     }
+    if (Number(formData.price) <= 0) {
+      error('Price must be greater than ৳0');
+      return;
+    }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     const payload = {
       _id: editingProduct?._id,
@@ -266,6 +273,8 @@ export default function AdminProductsPage() {
       }
     } catch {
       error('Error saving product');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -660,9 +669,10 @@ export default function AdminProductsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all"
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-xs shadow-md transition-all"
                 >
-                  {editingProduct ? 'Save Changes' : 'Publish Product'}
+                  {isSubmitting ? 'Saving...' : editingProduct ? 'Save Changes' : 'Publish Product'}
                 </button>
               </div>
             </form>

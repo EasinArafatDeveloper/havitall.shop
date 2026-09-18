@@ -30,10 +30,10 @@ export function verifyAdminCredentials(user: string, pass: string): boolean {
   const cleanUser = user.trim().toLowerCase();
   const cleanPass = pass.trim();
 
-  const isUserValid = timingSafeEqual(cleanUser, ADMIN_USERNAME.toLowerCase()) || timingSafeEqual(cleanUser, 'havitall');
-  const isPassValid = 
-    timingSafeEqual(cleanPass, ADMIN_PASSWORD) || 
-    timingSafeEqual(cleanPass, ADMIN_PIN);
+  const isUserValid = timingSafeEqual(cleanUser, ADMIN_USERNAME.toLowerCase());
+  const isPassValid =
+    timingSafeEqual(cleanPass, ADMIN_PASSWORD) ||
+    (process.env.ADMIN_PIN ? timingSafeEqual(cleanPass, ADMIN_PIN) : false);
 
   return isUserValid && isPassValid;
 }

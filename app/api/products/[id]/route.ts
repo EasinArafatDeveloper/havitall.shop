@@ -120,6 +120,10 @@ export async function PUT(
 
     const cleanId = id.trim().toLowerCase();
 
+    if (body.price !== undefined && (isNaN(Number(body.price)) || Number(body.price) <= 0)) {
+      return NextResponse.json({ success: false, error: 'Price must be greater than ৳0.' }, { status: 400 });
+    }
+
     // Calculate discount percentage if original price provided
     if (body.originalPrice !== undefined && body.price !== undefined) {
       const orig = Number(body.originalPrice);
@@ -237,7 +241,7 @@ export async function PUT(
       savedProduct = await Product.findOneAndUpdate(
         { slug: targetSlug },
         { $set: newProductDoc },
-        { upsert: true, new: true }
+        { upsert: true, new: true, runValidators: true }
       );
     }
 

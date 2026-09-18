@@ -55,12 +55,35 @@ export async function PUT(
     }
 
     const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { productId: id };
+    const existingOffer = await Offer.findOne(query).lean();
+    const offerType = body.offerType || existingOffer?.offerType;
+    const excludeId = existingOffer?._id || query._id || id;
 
-    if (body.offerType === 'top_bar' && body.isActive === true) {
+    if (offerType === 'top_bar' && body.isActive === true) {
       await Offer.updateMany(
-        { offerType: 'top_bar', _id: { $ne: query._id || id } },
+        { offerType: 'top_bar', _id: { $ne: excludeId } },
         { $set: { isActive: false } }
       );
+    } else if (offerType === 'popup_poster' && body.isActive === true) {
+      // Only one popup poster should be live at a time
+      await Offer.updateMany(
+        { offerType: 'popup_poster', _id: { $ne: excludeId } },
+        { $set: { isActive: false } }
+      );
+    } else if (offerType === 'flash_deal' && body.isActive === true) {
+      // Keep max 2 active flash deals on homepage, same rule as creating a new one
+      const activeDeals = await Offer.find({
+        offerType: 'flash_deal',
+        isActive: true,
+        _id: { $ne: excludeId },
+      }).sort({ updatedAt: 1 });
+      if (activeDeals.length >= 2) {
+        const toDeactivate = activeDeals.slice(0, activeDeals.length - 1);
+        await Offer.updateMany(
+          { _id: { $in: toDeactivate.map((o) => o._id) } },
+          { $set: { isActive: false } }
+        );
+      }
     }
 
     const updated = await Offer.findOneAndUpdate(

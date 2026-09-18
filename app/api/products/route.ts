@@ -247,8 +247,8 @@ export async function POST(request: Request) {
     }
 
     const numPrice = Number(price);
-    if (isNaN(numPrice) || numPrice < 0) {
-      return NextResponse.json({ success: false, error: 'Price must be a valid positive number.' }, { status: 400 });
+    if (isNaN(numPrice) || numPrice <= 0) {
+      return NextResponse.json({ success: false, error: 'Price must be greater than ৳0.' }, { status: 400 });
     }
 
     if (!category || typeof category !== 'string') {

@@ -11,6 +11,7 @@ import {
   RotateCcw 
 } from 'lucide-react';
 import ProductCard from '@/components/products/ProductCard';
+import ProductCardSkeleton from '@/components/products/ProductCardSkeleton';
 import QuickViewModal from '@/components/products/QuickViewModal';
 
 function ShopContent() {
@@ -303,9 +304,9 @@ function ShopContent() {
           {/* Product Grid Area */}
           <div className="lg:col-span-3">
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="h-80 rounded-2xl bg-white border border-slate-200 shadow-sm" />
+                  <ProductCardSkeleton key={i} />
                 ))}
               </div>
             ) : filteredProducts.length === 0 ? (

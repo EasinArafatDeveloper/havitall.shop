@@ -3,7 +3,6 @@ import connectToDatabase from '@/lib/mongodb';
 import Product from '@/lib/models/Product';
 import Category from '@/lib/models/Category';
 import Banner from '@/lib/models/Banner';
-import Order from '@/lib/models/Order';
 import Offer from '@/lib/models/Offer';
 import DeletedProduct from '@/lib/models/DeletedProduct';
 import { verifyAdminSession } from '@/lib/auth';
@@ -68,8 +67,8 @@ export async function POST(request: Request) {
       },
     });
 
-    // Clear demo orders
-    await Order.deleteMany({});
+    // Orders are never touched here — there is no way to distinguish a "demo" order from a
+    // real customer order in this schema, and deleting them all would destroy live order history.
 
     return NextResponse.json({
       success: true,

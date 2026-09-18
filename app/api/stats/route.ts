@@ -70,7 +70,9 @@ export async function GET(request: Request) {
       Order.find().lean(),
     ]);
 
-    const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const totalRevenue = orders
+      .filter((o) => o.orderStatus !== 'Cancelled')
+      .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     const pendingOrders = orders.filter((o) => o.orderStatus === 'Placed' || (o.paymentStatus === 'Pending' && o.orderStatus !== 'Cancelled')).length;
     const processingOrders = orders.filter((o) => o.orderStatus === 'Processing' || o.orderStatus === 'Confirmed').length;
     const shippedOrders = orders.filter((o) => o.orderStatus === 'Shipped').length;

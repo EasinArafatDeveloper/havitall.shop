@@ -5,12 +5,14 @@ import { ToastProvider } from "@/context/ToastContext";
 import { CartProvider } from "@/context/CartContext";
 import StoreLayoutWrapper from "@/components/layout/StoreLayoutWrapper";
 import MetaPixel from "@/components/analytics/MetaPixel";
+import RouteProgressBar from "@/components/layout/RouteProgressBar";
+import { toJsonLdHtml } from "@/lib/jsonld";
 
 const SITE_URL = "https://havitall.shop";
 const SITE_NAME = "HavItAll";
-const SITE_TITLE = "HavItAll | Luxury & Lifestyle E-Commerce in Bangladesh";
+const SITE_TITLE = "HavItAll — Best Gadget & Lifestyle Shop in Bangladesh | বাংলাদেশের সেরা গ্যাজেট শপ";
 const SITE_DESCRIPTION =
-  "Shop exclusive horological timepieces, hi-res acoustics, handcrafted Italian leather, and futuristic tech lifestyle gear at HavItAll — Bangladesh's luxury lifestyle destination with cash on delivery and nationwide shipping.";
+  "HavItAll (হ্যাভইটঅল) is Bangladesh's trusted online shop for wireless earbuds, smart watches, power banks, luxury watches, and lifestyle gadgets — with cash on delivery and nationwide shipping. বাংলাদেশের সেরা গ্যাজেট ও লাইফস্টাইল প্রোডাক্টের অনলাইন শপ, ক্যাশ অন ডেলিভারি সুবিধাসহ।";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -21,11 +23,20 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   keywords: [
     "HavItAll",
-    "luxury lifestyle Bangladesh",
-    "online shopping Bangladesh",
-    "watches Bangladesh",
+    "Havitall Bangladesh",
+    "havitall.shop",
+    "best gadget shop in Bangladesh",
+    "বাংলাদেশের সেরা গ্যাজেট শপ",
+    "online gadget shop Bangladesh",
+    "গ্যাজেট শপ বাংলাদেশ",
+    "wireless earbuds Bangladesh",
+    "smart watch price in Bangladesh",
+    "power bank price in Bangladesh",
+    "luxury watches Bangladesh",
+    "electronics shop Dhaka",
+    "ঢাকা গ্যাজেট শপ",
+    "online shopping Bangladesh cash on delivery",
     "leather bags Bangladesh",
-    "gadgets and accessories",
     "premium ecommerce Bangladesh",
   ],
   applicationName: SITE_NAME,
@@ -86,11 +97,39 @@ export const viewport: Viewport = {
 
 const organizationJsonLd = {
   "@context": "https://schema.org",
-  "@type": "Organization",
+  "@type": "Store",
+  "@id": `${SITE_URL}/#organization`,
   name: SITE_NAME,
+  alternateName: "Havitall",
   url: SITE_URL,
   logo: `${SITE_URL}/icon`,
+  image: `${SITE_URL}/opengraph-image`,
   description: SITE_DESCRIPTION,
+  email: "havitall.info@gmail.com",
+  telephone: "+8801356593305",
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: "Bashundhara",
+    addressLocality: "Dhaka",
+    postalCode: "1229",
+    addressCountry: "BD",
+  },
+  areaServed: "BD",
+  priceRange: "৳৳",
+  openingHoursSpecification: {
+    "@type": "OpeningHoursSpecification",
+    dayOfWeek: [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday",
+    ],
+    opens: "00:00",
+    closes: "23:59",
+  },
   sameAs: ["https://www.facebook.com/havitall"],
 };
 
@@ -116,17 +155,18 @@ export default function RootLayout({
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: toJsonLdHtml(organizationJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: toJsonLdHtml(websiteJsonLd) }}
         />
       </head>
       <body className="min-h-screen bg-slate-50 text-slate-900 antialiased selection:bg-rose-600 selection:text-white">
         <Suspense fallback={null}>
           <MetaPixel />
         </Suspense>
+        <RouteProgressBar />
         <ToastProvider>
           <CartProvider>
             <StoreLayoutWrapper>

@@ -17,10 +17,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'No image file provided' }, { status: 400 });
     }
 
-    // Verify file type
+    // Verify file type (SVG is deliberately excluded — it can embed <script> and would be served
+    // back from our own domain, which is a stored-XSS risk)
     const mimeType = file.type;
-    if (!mimeType.startsWith('image/')) {
-      return NextResponse.json({ success: false, error: 'File must be an image (PNG, JPG, WEBP, GIF, SVG).' }, { status: 400 });
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(mimeType)) {
+      return NextResponse.json({ success: false, error: 'File must be an image (PNG, JPG, WEBP, or GIF).' }, { status: 400 });
     }
 
     // Limit file size (max 8MB)
@@ -57,6 +59,6 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     const err = error as Error;
     console.error('File upload error:', err.message);
-    return NextResponse.json({ success: false, error: 'Failed to upload image file: ' + err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Failed to upload image file.' }, { status: 500 });
   }
 }

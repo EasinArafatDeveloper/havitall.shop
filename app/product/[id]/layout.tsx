@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import connectToDatabase from "@/lib/mongodb";
 import Product from "@/lib/models/Product";
 import { fetchBusinessKoroProducts } from "@/lib/businessKoro";
+import { toJsonLdHtml } from "@/lib/jsonld";
+import { getProductFaq } from "@/lib/seoContent";
 
 const SITE_URL = "https://havitall.shop";
 
@@ -58,10 +60,13 @@ export async function generateMetadata({
     };
   }
 
-  const title = product.name;
+  const title = `${product.name} — Price in Bangladesh`;
+  const effectivePrice = product.offerPrice || product.price;
+  const priceText = effectivePrice ? `৳${effectivePrice}` : undefined;
   const description =
-    product.shortDescription ||
-    (product.description ? String(product.description).substring(0, 155) : `Buy ${product.name} at HavItAll.`);
+    (product.shortDescription ||
+      (product.description ? String(product.description).substring(0, 140) : `Buy ${product.name} online at HavItAll.`)) +
+    (priceText ? ` Price: ${priceText}. Cash on delivery all over Bangladesh.` : ' Cash on delivery all over Bangladesh.');
   const image = product.images?.[0];
   const url = `${SITE_URL}/product/${product.slug || params.id}`;
 
@@ -115,7 +120,7 @@ export default async function ProductLayout({
           "@type": "Offer",
           url: `${SITE_URL}/product/${product.slug || params.id}`,
           priceCurrency: "BDT",
-          price: product.price,
+          price: product.offerPrice || product.price,
           availability:
             product.stock > 0
               ? "https://schema.org/InStock"
@@ -124,12 +129,53 @@ export default async function ProductLayout({
       }
     : null;
 
+  const faqJsonLd = product
+    ? {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: getProductFaq(product).map((faq) => ({
+          "@type": "Question",
+          name: faq.question,
+          acceptedAnswer: { "@type": "Answer", text: faq.answer },
+        })),
+      }
+    : null;
+
+  const breadcrumbJsonLd = product
+    ? {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+          { "@type": "ListItem", position: 2, name: "Shop", item: `${SITE_URL}/shop` },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: product.name,
+            item: `${SITE_URL}/product/${product.slug || params.id}`,
+          },
+        ],
+      }
+    : null;
+
   return (
     <>
       {jsonLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: toJsonLdHtml(jsonLd) }}
+        />
+      )}
+      {breadcrumbJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: toJsonLdHtml(breadcrumbJsonLd) }}
+        />
+      )}
+      {faqJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: toJsonLdHtml(faqJsonLd) }}
         />
       )}
       {children}

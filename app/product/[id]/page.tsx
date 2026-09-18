@@ -21,6 +21,8 @@ import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
 import ProductCard from '@/components/products/ProductCard';
 import { trackViewContent } from '@/lib/fbpixel';
+import { getProductFaq, getProductSeoIntro } from '@/lib/seoContent';
+import ProductDetailSkeleton from '@/components/products/ProductDetailSkeleton';
 
 export default function ProductDetailPage() {
   const router = useRouter();
@@ -77,14 +79,7 @@ export default function ProductDetailPage() {
   }, [id]);
 
   if (loading) {
-    return (
-      <div className="min-h-[70vh] flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-semibold text-slate-500">Loading exquisite product details...</p>
-        </div>
-      </div>
-    );
+    return <ProductDetailSkeleton />;
   }
 
   if (!product) {
@@ -233,6 +228,9 @@ export default function ProductDetailPage() {
               {/* Short Description */}
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                 {product.shortDescription || product.description}
+              </p>
+              <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                {getProductSeoIntro(product)}
               </p>
 
               {/* Color Variants */}
@@ -489,6 +487,26 @@ export default function ProductDetailPage() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* FAQ Section */}
+        <div className="mb-16 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
+          <h2 className="text-xl font-bold font-display text-slate-950 mb-6">
+            Frequently Asked Questions
+          </h2>
+          <div className="divide-y divide-slate-100">
+            {getProductFaq(product).map((faq, i) => (
+              <details key={i} className="group py-4 first:pt-0 last:pb-0">
+                <summary className="flex items-center justify-between gap-3 cursor-pointer list-none text-sm font-bold text-slate-900">
+                  <span>{faq.question}</span>
+                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0 transition-transform group-open:rotate-90" />
+                </summary>
+                <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  {faq.answer}
+                </p>
+              </details>
+            ))}
+          </div>
         </div>
 
         {/* Related Products Section */}

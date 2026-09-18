@@ -41,6 +41,7 @@ const config: Config = {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'float': 'float 4s ease-in-out infinite',
         'shimmer': 'shimmer 2s linear infinite',
+        'route-progress': 'route-progress 1.4s ease-out forwards',
       },
       keyframes: {
         float: {
@@ -50,7 +51,13 @@ const config: Config = {
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
-        }
+        },
+        'route-progress': {
+          '0%': { width: '0%' },
+          '30%': { width: '45%' },
+          '70%': { width: '75%' },
+          '100%': { width: '90%' },
+        },
       }
     },
   },

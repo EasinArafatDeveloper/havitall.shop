@@ -214,7 +214,7 @@ export default function LiveSearchBar({
           className={`relative flex items-center transition-all duration-200 ${
             isHero
               ? 'bg-white/95 backdrop-blur-md rounded-2xl border-2 border-slate-900/10 hover:border-slate-900/30 focus-within:border-slate-950 focus-within:ring-4 focus-within:ring-slate-950/10 shadow-lg'
-              : 'bg-slate-100 hover:bg-slate-200/70 focus-within:bg-white rounded-full border border-slate-200 focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-400/20 shadow-xs'
+              : 'bg-slate-50/90 hover:bg-slate-100/90 focus-within:bg-white rounded-full border border-slate-200/80 focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-900/5 shadow-2xs'
           }`}
         >
           {/* Magnifier Icon / Loading Spinner */}

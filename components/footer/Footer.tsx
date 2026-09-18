@@ -162,15 +162,15 @@ export default function Footer() {
             <ul className="space-y-2.5 text-xs">
               <li className="flex items-center gap-2">
                 <Phone className="w-3.5 h-3.5 text-slate-950 shrink-0" />
-                <span>+880 1700-000000</span>
+                <span>01356-593305</span>
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="w-3.5 h-3.5 text-slate-950 shrink-0" />
-                <span>support@havitall.com</span>
+                <span>havitall.info@gmail.com</span>
               </li>
               <li className="flex items-start gap-2">
                 <MapPin className="w-3.5 h-3.5 text-slate-950 shrink-0 mt-0.5" />
-                <span>Banani Luxury Plaza, Dhaka, Bangladesh</span>
+                <span>Bashundhara, Dhaka 1229, Bangladesh</span>
               </li>
             </ul>
 
