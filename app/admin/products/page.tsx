@@ -62,7 +62,7 @@ export default function AdminProductsPage() {
 
   const handleScanDrive = async () => {
     if (!driveScanUrl.trim()) {
-      error('Please enter a Google Drive folder link');
+      error('Please enter a Google Drive link (Folder or File)');
       return;
     }
     setIsScanningDrive(true);
@@ -74,21 +74,38 @@ export default function AdminProductsPage() {
       });
       const data = await res.json();
       if (data.success && data.images?.length > 0) {
-        success(`Found ${data.images.length} photoshoot images from Google Drive!`);
+        success(`Successfully added ${data.images.length} photo(s) from Google Drive!`);
         const newItems = data.images.map((url: string, i: number) => ({
           url,
           name: `Drive Photo ${i + 1}`,
         }));
+        
+        // Add to media library
         setMediaLibrary((prev) => {
           const existing = new Set(prev.map((p) => p.url));
           const unique = newItems.filter((item: any) => !existing.has(item.url));
           return [...prev, ...unique];
         });
+
+        // Automatically select the newly scanned images into formData.imageUrls
+        setFormData((prev) => {
+          const currentList = prev.imageUrls
+            .split(/[\n,]+/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+          const toAdd = data.images.filter((u: string) => !currentList.includes(u));
+          return {
+            ...prev,
+            imageUrls: [...currentList, ...toAdd].join('\n'),
+          };
+        });
+
+        setDriveScanUrl('');
       } else {
-        error(data.error || 'No images found in this Drive link');
+        error(data.error || 'No images found in this Google Drive link');
       }
     } catch {
-      error('Failed to scan Google Drive folder');
+      error('Failed to scan Google Drive link');
     } finally {
       setIsScanningDrive(false);
     }

@@ -46,8 +46,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Google Drive URL is required' }, { status: 400 });
     }
 
-    // Fetch the drive folder or file page
-    const res = await fetch(driveUrl, {
+    const trimmed = String(driveUrl).trim();
+
+    // 1. Check if it's a single file link: /file/d/FILE_ID or ?id=FILE_ID
+    const singleFileMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (singleFileMatch && singleFileMatch[1] && !trimmed.includes('/folders/')) {
+      const fileId = singleFileMatch[1];
+      const directUrl = `https://lh3.googleusercontent.com/d/${fileId}`;
+      return NextResponse.json({
+        success: true,
+        count: 1,
+        images: [directUrl],
+      });
+    }
+
+    // 2. Otherwise it's a Drive Folder or collection: fetch and extract files
+    const res = await fetch(trimmed, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
@@ -55,15 +69,18 @@ export async function POST(req: Request) {
     const html = await res.text();
 
     // Extract all candidate drive image IDs (33 chars)
+    const folderMatch = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    const folderId = folderMatch ? folderMatch[1] : '';
+
     const matches = Array.from(html.matchAll(/"([a-zA-Z0-9_-]{33})"/g)).map(m => m[1]);
-    const uniqueIds = Array.from(new Set(matches)).filter(id => !driveUrl.includes(id));
+    const uniqueIds = Array.from(new Set(matches)).filter(id => id !== folderId);
 
     const directUrls = uniqueIds.map(id => `https://lh3.googleusercontent.com/d/${id}`);
 
     return NextResponse.json({
       success: true,
       count: directUrls.length,
-      images: directUrls
+      images: directUrls,
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
