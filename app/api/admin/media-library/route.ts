@@ -19,10 +19,12 @@ export async function GET(req: Request) {
         const fullPath = path.join(dir, file);
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
-          scanDir(fullPath, `${relPath}/${file}`);
+          const nextRel = relPath ? `${relPath}/${file}` : file;
+          scanDir(fullPath, nextRel);
         } else if (/\.(jpg|jpeg|png|webp|gif|svg)$/i.test(file)) {
+          const cleanUrl = `/uploads/${relPath ? relPath + '/' : ''}${file}`.replace(/\/+/g, '/');
           images.push({
-            url: `/uploads/${relPath ? relPath + '/' : ''}${file}`,
+            url: cleanUrl,
             name: file,
           });
         }
