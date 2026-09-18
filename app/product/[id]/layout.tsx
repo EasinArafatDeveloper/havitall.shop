@@ -60,14 +60,22 @@ export async function generateMetadata({
     };
   }
 
-  const title = `${product.name} — Price in Bangladesh`;
   const effectivePrice = product.offerPrice || product.price;
-  const priceText = effectivePrice ? `৳${effectivePrice}` : undefined;
-  const description =
-    (product.shortDescription ||
-      (product.description ? String(product.description).substring(0, 140) : `Buy ${product.name} online at HavItAll.`)) +
-    (priceText ? ` Price: ${priceText}. Cash on delivery all over Bangladesh.` : ' Cash on delivery all over Bangladesh.');
-  const image = product.images?.[0];
+  const priceFormatted = effectivePrice ? `৳${Number(effectivePrice).toLocaleString()}` : '';
+  const title = priceFormatted 
+    ? `${product.name} — ${priceFormatted} | HavItAll`
+    : `${product.name} — Best Price in Bangladesh | HavItAll`;
+
+  const rawDesc = product.shortDescription || product.description || `Buy original ${product.name} online at HavItAll Bangladesh.`;
+  const cleanDesc = String(rawDesc).replace(/<[^>]*>?/gm, '').substring(0, 160).trim();
+  const description = `${cleanDesc} ${priceFormatted ? `Price: ${priceFormatted}.` : ''} Cash on delivery available nationwide.`;
+
+  // Ensure absolute image URL for Facebook / WhatsApp / Messenger crawlers
+  let rawImage = (product.images && product.images.length > 0 ? product.images[0] : product.image) || `${SITE_URL}/opengraph-image`;
+  if (rawImage.startsWith('/')) {
+    rawImage = `${SITE_URL}${rawImage}`;
+  }
+
   const url = `${SITE_URL}/product/${product.slug || params.id}`;
 
   return {
@@ -76,16 +84,25 @@ export async function generateMetadata({
     alternates: { canonical: url },
     openGraph: {
       type: "website",
+      siteName: "HavItAll",
+      locale: "en_US",
       url,
       title,
       description,
-      images: image ? [{ url: image, width: 1000, height: 1000, alt: product.name }] : undefined,
+      images: [
+        {
+          url: rawImage,
+          width: 1000,
+          height: 1000,
+          alt: product.name,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: image ? [image] : undefined,
+      images: [rawImage],
     },
   };
 }

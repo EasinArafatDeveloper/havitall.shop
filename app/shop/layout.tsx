@@ -11,14 +11,25 @@ export const metadata: Metadata = {
   alternates: { canonical: `${SITE_URL}/shop` },
   openGraph: {
     type: "website",
+    siteName: "HavItAll",
+    locale: "en_US",
     url: `${SITE_URL}/shop`,
     title: `${TITLE} | HavItAll`,
     description: DESCRIPTION,
+    images: [
+      {
+        url: `${SITE_URL}/opengraph-image`,
+        width: 1200,
+        height: 630,
+        alt: "HavItAll Shop All Products",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: `${TITLE} | HavItAll`,
     description: DESCRIPTION,
+    images: [`${SITE_URL}/opengraph-image`],
   },
 };
 
