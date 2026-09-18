@@ -59,6 +59,56 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+export async function PUT(request: Request) {
+  const session = verifyAdminSession(request);
+  if (!session.authenticated) {
+    return NextResponse.json({ success: false, error: 'Unauthorized. Admin access required.' }, { status: 401 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const body = await request.json().catch(() => ({}));
+    const id = searchParams.get('id') || body._id || body.id;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Banner ID is required for update' }, { status: 400 });
+    }
+
+    const updateData: any = {};
+    if (body.title !== undefined) updateData.title = String(body.title).trim();
+    if (body.image !== undefined) updateData.image = String(body.image).trim();
+    if (body.buttonLink !== undefined) updateData.buttonLink = String(body.buttonLink).trim();
+    if (body.buttonText !== undefined) updateData.buttonText = String(body.buttonText).trim();
+    if (body.subtitle !== undefined) updateData.subtitle = String(body.subtitle).trim();
+    if (body.tagline !== undefined) updateData.tagline = String(body.tagline).trim();
+    if (body.discountBadge !== undefined) updateData.discountBadge = String(body.discountBadge).trim();
+    if (body.bgColor !== undefined) updateData.bgColor = body.bgColor;
+    if (body.order !== undefined) updateData.order = Number(body.order);
+    if (body.isActive !== undefined) updateData.isActive = Boolean(body.isActive);
+
+    const db = await connectToDatabase();
+    if (!db) {
+      return NextResponse.json({ success: false, error: 'Database service unavailable' }, { status: 503 });
+    }
+
+    let updatedBanner = null;
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      updatedBanner = await Banner.findByIdAndUpdate(id, { $set: updateData }, { new: true });
+    } else {
+      updatedBanner = await Banner.findOneAndUpdate({ $or: [{ _id: id }, { title: id }] }, { $set: updateData }, { new: true });
+    }
+
+    if (!updatedBanner) {
+      return NextResponse.json({ success: false, error: 'Banner not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, banner: updatedBanner, message: 'Hero poster updated successfully' });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error updating banner:', err.message);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
 
 export async function DELETE(request: Request) {
   const session = verifyAdminSession(request);
