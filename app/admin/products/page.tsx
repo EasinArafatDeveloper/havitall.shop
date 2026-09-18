@@ -23,6 +23,9 @@ export default function AdminProductsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'featured' | 'hot'>('all');
+  const [mediaLibrary, setMediaLibrary] = useState<{ url: string; name: string }[]>([]);
+  const [driveScanUrl, setDriveScanUrl] = useState('');
+  const [isScanningDrive, setIsScanningDrive] = useState(false);
   const { success, error, info } = useToast();
 
   const [formData, setFormData] = useState({
@@ -42,6 +45,71 @@ export default function AdminProductsPage() {
     sizes: '',
     features: '',
   });
+
+  const loadMediaLibrary = async () => {
+    try {
+      const res = await fetch('/api/admin/media-library');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.images)) {
+        setMediaLibrary(data.images);
+      }
+    } catch (e) {
+      console.error('Error loading media library:', e);
+    }
+  };
+
+  const handleScanDrive = async () => {
+    if (!driveScanUrl.trim()) {
+      error('Please enter a Google Drive folder link');
+      return;
+    }
+    setIsScanningDrive(true);
+    try {
+      const res = await fetch('/api/admin/media-library', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driveUrl: driveScanUrl.trim() }),
+      });
+      const data = await res.json();
+      if (data.success && data.images?.length > 0) {
+        success(`Found ${data.images.length} photoshoot images from Google Drive!`);
+        const newItems = data.images.map((url: string, i: number) => ({
+          url,
+          name: `Drive Photo ${i + 1}`,
+        }));
+        setMediaLibrary((prev) => {
+          const existing = new Set(prev.map((p) => p.url));
+          const unique = newItems.filter((item: any) => !existing.has(item.url));
+          return [...prev, ...unique];
+        });
+      } else {
+        error(data.error || 'No images found in this Drive link');
+      }
+    } catch {
+      error('Failed to scan Google Drive folder');
+    } finally {
+      setIsScanningDrive(false);
+    }
+  };
+
+  const toggleImageSelection = (imgUrl: string) => {
+    const currentList = formData.imageUrls
+      .split(/[\n,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const existsIndex = currentList.indexOf(imgUrl);
+    let updatedList: string[];
+    if (existsIndex > -1) {
+      updatedList = currentList.filter((u) => u !== imgUrl);
+    } else {
+      updatedList = [...currentList, imgUrl];
+    }
+    setFormData((prev) => ({
+      ...prev,
+      imageUrls: updatedList.join('\n'),
+    }));
+  };
 
   const loadData = async () => {
     try {
@@ -65,6 +133,7 @@ export default function AdminProductsPage() {
 
   useEffect(() => {
     loadData();
+    loadMediaLibrary();
   }, []);
 
   const handleToggleFeatured = async (product: any) => {
@@ -594,40 +663,129 @@ export default function AdminProductsPage() {
                   />
                 </div>
 
-                {/* Multi-Image Gallery URLs */}
-                <div className="space-y-1.5 sm:col-span-2">
-                  <div className="flex items-center justify-between">
-                    <label className="font-semibold text-slate-700">
-                      Product Gallery Images (একাধিক ছবির লিংক প্রতি লাইনে ১টি করে দিন)
-                    </label>
-                    <span className="text-[10px] text-slate-400">
-                      Supports direct image links / Google Drive image links
-                    </span>
+                {/* Multi-Image Gallery & Visual Photoshoot Selector */}
+                <div className="space-y-3 sm:col-span-2 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <label className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                        <span>📸 Product Photo Selection Gallery</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          {formData.imageUrls.split(/[\n,]+/).map(s => s.trim()).filter(Boolean).length} Selected
+                        </span>
+                      </label>
+                      <p className="text-[11px] text-slate-500">
+                        নিচের ছবিগুলোতে ক্লিক করে যে যে ছবি প্রোডাক্ট পেজে দেখাতে চান সেগুলো সিলেক্ট করুন (১ম ছবিটি কভার হবে)
+                      </p>
+                    </div>
+
+                    {/* Drive Folder Scanner */}
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Paste Drive Folder Link..."
+                        value={driveScanUrl}
+                        onChange={(e) => setDriveScanUrl(e.target.value)}
+                        className="text-[11px] bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-slate-900 w-44 sm:w-52 focus:outline-none focus:border-slate-950 shadow-2xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleScanDrive}
+                        disabled={isScanningDrive}
+                        className="px-3 py-1.5 bg-slate-950 hover:bg-slate-800 disabled:bg-slate-400 text-white text-[10px] font-bold rounded-xl transition-all shadow-xs shrink-0 cursor-pointer"
+                      >
+                        {isScanningDrive ? 'Scanning...' : 'Scan Drive'}
+                      </button>
+                    </div>
                   </div>
-                  <textarea
-                    rows={3}
-                    placeholder={`https://images.unsplash.com/...&#10;https://drive.google.com/uc?export=view&id=FILE_ID&#10;https://...`}
-                    value={formData.imageUrls}
-                    onChange={(e) => setFormData({ ...formData, imageUrls: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white text-xs font-mono"
-                  />
-                  {/* Live Thumbnails Preview */}
-                  {formData.imageUrls.trim() && (
-                    <div className="flex items-center gap-2 overflow-x-auto pt-1">
-                      {formData.imageUrls
-                        .split(/[\n,]+/)
-                        .map((s) => s.trim())
-                        .filter(Boolean)
-                        .map((url, idx) => (
-                          <div key={idx} className="relative w-14 h-14 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden shrink-0">
-                            <img src={formatImageUrl(url)} alt={`Preview ${idx + 1}`} className="w-full h-full object-contain p-0.5" />
-                            <span className="absolute bottom-0 right-0 bg-slate-900/80 text-white text-[8px] font-bold px-1 rounded-tl">
-                              #{idx + 1}
-                            </span>
-                          </div>
-                        ))}
+
+                  {/* Visual Clickable Photoshoot Grid */}
+                  {mediaLibrary.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
+                        <span>Available Photoshoot Photos ({mediaLibrary.length} Photos):</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const all = mediaLibrary.map(m => m.url).join('\n');
+                              setFormData(prev => ({ ...prev, imageUrls: all }));
+                            }}
+                            className="text-indigo-600 hover:underline cursor-pointer"
+                          >
+                            Select All
+                          </button>
+                          <span>•</span>
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, imageUrls: '' }))}
+                            className="text-rose-600 hover:underline cursor-pointer"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-56 overflow-y-auto p-2 bg-white rounded-2xl border border-slate-200 shadow-inner">
+                        {mediaLibrary.map((item, idx) => {
+                          const currentSelected = formData.imageUrls
+                            .split(/[\n,]+/)
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                          const selectIndex = currentSelected.indexOf(item.url);
+                          const isSelected = selectIndex !== -1;
+
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => toggleImageSelection(item.url)}
+                              title={item.name}
+                              className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all p-1 group cursor-pointer ${
+                                isSelected
+                                  ? 'border-emerald-600 ring-2 ring-emerald-500/20 shadow-md bg-emerald-50 scale-95'
+                                  : 'border-slate-200 opacity-70 hover:opacity-100 hover:border-slate-400 bg-slate-50'
+                              }`}
+                            >
+                              <img
+                                src={formatImageUrl(item.url)}
+                                alt={item.name}
+                                referrerPolicy="no-referrer"
+                                className="w-full h-full object-contain rounded-lg"
+                              />
+                              {isSelected ? (
+                                <span className="absolute top-1 right-1 bg-emerald-600 text-white rounded-full w-4 h-4 text-[9px] font-black flex items-center justify-center shadow-xs">
+                                  ✓
+                                </span>
+                              ) : (
+                                <span className="absolute top-1 right-1 bg-slate-900/40 text-white rounded-full w-4 h-4 text-[9px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  +
+                                </span>
+                              )}
+                              {isSelected && (
+                                <span className="absolute bottom-0 inset-x-0 bg-emerald-800/90 text-white text-[8px] font-bold text-center py-0.5">
+                                  {selectIndex === 0 ? '★ Cover' : `#${selectIndex + 1}`}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
+
+                  {/* Selected Gallery Order List & Manual Link Input */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="font-semibold text-slate-700 text-[11px]">
+                      Selected Product Image URLs (সরাসরি বা কাস্টম লিংক এডিট করুন):
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="https://... or /uploads/products/..."
+                      value={formData.imageUrls}
+                      onChange={(e) => setFormData({ ...formData, imageUrls: e.target.value })}
+                      className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 focus:outline-none focus:border-slate-950 text-xs font-mono"
+                    />
+                  </div>
                 </div>
 
                 {/* Product Video Showcase URL */}
