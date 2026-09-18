@@ -52,9 +52,34 @@ export async function POST(req: Request) {
     const singleFileMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
     if (singleFileMatch && singleFileMatch[1] && !trimmed.includes('/folders/')) {
       const fileId = singleFileMatch[1];
+      
+      try {
+        const fileRes = await fetch(`https://drive.google.com/file/d/${fileId}/view?usp=sharing`, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+        });
+        const html = await fileRes.text();
+        const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i) || html.match(/<title>([^<]+)<\/title>/i);
+        const fileName = titleMatch ? titleMatch[1] : '';
+        const isVideo = /\.(mp4|mov|webm|mkv|avi|m4v|3gp|flv)$/i.test(fileName) || html.includes('video/mp4') || html.includes('drive-viewer-video') || html.includes('video_player');
+
+        if (isVideo) {
+          return NextResponse.json({
+            success: true,
+            isVideo: true,
+            fileId,
+            name: fileName || 'Google Drive Video',
+            videoUrl: `https://drive.google.com/file/d/${fileId}/preview`,
+            thumbnail: `https://lh3.googleusercontent.com/d/${fileId}`,
+          });
+        }
+      } catch (e) {
+        console.error('Error inspecting single Drive file:', e);
+      }
+
       const directUrl = `https://lh3.googleusercontent.com/d/${fileId}`;
       return NextResponse.json({
         success: true,
+        isVideo: false,
         count: 1,
         images: [directUrl],
       });
@@ -79,6 +104,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
+      isVideo: false,
       count: directUrls.length,
       images: directUrls,
     });

@@ -61,14 +61,30 @@ export default function AdminProductsPage() {
         body: JSON.stringify({ driveUrl: driveScanUrl.trim() }),
       });
       const data = await res.json();
-      if (data.success && data.images?.length > 0) {
-        success(`${data.images.length} Drive photo(s) found! Click on the photos below to select only the ones you want.`);
-        // Set scanned photos for this product session
-        setScannedDrivePhotos(data.images);
-        // Note: Photos remain unselected by default so user can choose specifically
-        setDriveScanUrl('');
+      if (data.success) {
+        if (data.isVideo) {
+          // If the scanned link is a video, automatically set it to the videoUrl field!
+          setFormData(prev => ({
+            ...prev,
+            videoUrl: data.videoUrl || `https://drive.google.com/file/d/${data.fileId}/preview`,
+            // If this file was accidentally in imageUrls, remove it
+            imageUrls: prev.imageUrls
+              .split(/[\n,]+/)
+              .map(s => s.trim())
+              .filter(s => !s.includes(data.fileId))
+              .join('\n')
+          }));
+          success(`🎬 Video detected: "${data.name}" set to Product Video! Save changes to apply.`);
+          setDriveScanUrl('');
+        } else if (data.images?.length > 0) {
+          success(`${data.images.length} Drive photo(s) found! Click on the photos below to select only the ones you want.`);
+          setScannedDrivePhotos(data.images);
+          setDriveScanUrl('');
+        } else {
+          error('No media found in this Google Drive link');
+        }
       } else {
-        error(data.error || 'No images found in this Google Drive link');
+        error(data.error || 'No images or videos found in this Google Drive link');
       }
     } catch {
       error('Failed to scan Google Drive link');
