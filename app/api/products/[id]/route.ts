@@ -6,6 +6,9 @@ import FeaturedProduct from '@/lib/models/FeaturedProduct';
 import { fetchBusinessKoroProducts } from '@/lib/businessKoro';
 import { verifyAdminSession } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -182,8 +185,10 @@ export async function PUT(
       if (body.category) existingProduct.category = body.category.trim();
       if (body.stock !== undefined) existingProduct.stock = Number(body.stock);
       if (body.description) existingProduct.description = body.description;
-      if (body.shortDescription !== undefined) existingProduct.shortDescription = body.shortDescription;
-      if (body.images && Array.isArray(body.images) && body.images.length > 0) existingProduct.images = body.images;
+      if (body.images && Array.isArray(body.images) && body.images.length > 0) {
+        existingProduct.images = body.images;
+        existingProduct.image = body.images[0];
+      }
       if (body.isHot !== undefined) existingProduct.isHot = Boolean(body.isHot);
       if (body.isFeatured !== undefined) existingProduct.isFeatured = Boolean(body.isFeatured);
       if (body.badge !== undefined) existingProduct.badge = body.badge;

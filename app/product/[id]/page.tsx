@@ -46,7 +46,7 @@ export default function ProductDetailPage() {
     async function loadProduct() {
       try {
         setLoading(true);
-        const res = await fetch(`/api/products/${id}`);
+        const res = await fetch(`/api/products/${id}`, { cache: 'no-store' });
         const data = await res.json();
         if (data.success && data.product) {
           setProduct(data.product);
