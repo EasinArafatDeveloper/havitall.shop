@@ -83,8 +83,10 @@ export const metadata: Metadata = {
     apple: "/apple-icon",
   },
   manifest: "/manifest.webmanifest",
-  formatDetection: {
-    telephone: false,
+  verification: {
+    other: {
+      "facebook-domain-verification": ["9mkp6356fcq33kkdcebbh9mm1r03i0"],
+    },
   },
 };
 
@@ -153,6 +155,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <head>
+        <meta
+          name="facebook-domain-verification"
+          content="9mkp6356fcq33kkdcebbh9mm1r03i0"
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: toJsonLdHtml(organizationJsonLd) }}
