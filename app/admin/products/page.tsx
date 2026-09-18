@@ -332,7 +332,7 @@ export default function AdminProductsPage() {
       category: formData.category,
       stock: Number(formData.stock),
       images: parsedImages.length > 0 ? parsedImages : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'],
-      videoUrl: formData.videoUrl.trim() || undefined,
+      videoUrl: formData.videoUrl.trim(),
       description: formData.description.trim(),
       shortDescription: formData.shortDescription.trim(),
       isHot: formData.isHot,
