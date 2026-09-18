@@ -24,6 +24,8 @@ import { trackViewContent } from '@/lib/fbpixel';
 import { getProductFaq, getProductSeoIntro } from '@/lib/seoContent';
 import ProductDetailSkeleton from '@/components/products/ProductDetailSkeleton';
 
+import { formatImageUrl, formatVideoEmbed } from '@/lib/mediaUtils';
+
 export default function ProductDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -100,9 +102,11 @@ export default function ProductDetailPage() {
   }
 
   const inWishlist = isInWishlist(product._id || product.id || product.slug);
-  const images = product.images && product.images.length > 0 ? product.images : [product.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'];
+  const rawImages = product.images && product.images.length > 0 ? product.images : [product.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'];
+  const images = rawImages.map((img: string) => formatImageUrl(img));
   const colors = product.variants?.colors || [];
   const sizes = product.variants?.sizes || [];
+  const videoInfo = formatVideoEmbed(product.videoUrl);
 
   const handleAddToCart = () => {
     addToCart(product, quantity, selectedColor, selectedSize);
@@ -148,34 +152,20 @@ export default function ProductDetailPage() {
           <div className="lg:col-span-6 flex flex-col gap-4">
             {/* Main High-res Image or Video Player */}
             <div className="relative aspect-square w-full rounded-3xl overflow-hidden bg-white p-4 border border-slate-200 shadow-sm flex items-center justify-center">
-              {selectedImgIdx === -1 && product.videoUrl ? (
+              {selectedImgIdx === -1 && videoInfo.type !== 'empty' ? (
                 // Video Player Mode
                 <div className="w-full h-full rounded-2xl overflow-hidden bg-black flex items-center justify-center">
-                  {product.videoUrl.includes('youtube.com') || product.videoUrl.includes('youtu.be') ? (
+                  {videoInfo.type === 'youtube' || videoInfo.type === 'drive' ? (
                     <iframe
-                      src={
-                        product.videoUrl.includes('youtu.be/')
-                          ? `https://www.youtube.com/embed/${product.videoUrl.split('youtu.be/')[1]?.split('?')[0]}`
-                          : product.videoUrl.includes('shorts/')
-                          ? `https://www.youtube.com/embed/${product.videoUrl.split('shorts/')[1]?.split('?')[0]}`
-                          : `https://www.youtube.com/embed/${new URLSearchParams(new URL(product.videoUrl).search).get('v')}`
-                      }
+                      src={videoInfo.embedUrl}
                       title={product.name}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
                       className="w-full h-full rounded-2xl border-0"
                     />
-                  ) : product.videoUrl.includes('drive.google.com') ? (
-                    <iframe
-                      src={product.videoUrl.replace(/\/view.*$/, '/preview').replace(/\/edit.*$/, '/preview')}
-                      title={product.name}
-                      allow="autoplay"
-                      allowFullScreen
-                      className="w-full h-full rounded-2xl border-0"
-                    />
                   ) : (
                     <video
-                      src={product.videoUrl}
+                      src={videoInfo.embedUrl}
                       controls
                       autoPlay
                       className="w-full h-full object-contain rounded-2xl"
@@ -200,7 +190,7 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Thumbnail Row (Images + Video Preview) */}
-            {(images.length > 1 || product.videoUrl) && (
+            {(images.length > 1 || videoInfo.type !== 'empty') && (
               <div className="flex items-center gap-3 overflow-x-auto pb-2">
                 {images.map((img: string, idx: number) => (
                   <button
@@ -217,7 +207,7 @@ export default function ProductDetailPage() {
                 ))}
 
                 {/* Video Play Button Thumbnail */}
-                {product.videoUrl && (
+                {videoInfo.type !== 'empty' && (
                   <button
                     onClick={() => setSelectedImgIdx(-1)}
                     className={`w-20 h-20 rounded-2xl overflow-hidden border-2 shrink-0 transition-all bg-slate-950 text-white flex flex-col items-center justify-center gap-1 cursor-pointer ${

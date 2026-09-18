@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { motion } from 'framer-motion';
+import { formatImageUrl } from '@/lib/mediaUtils';
 
 interface ProductCardProps {
   product: any;
@@ -24,8 +25,10 @@ export default function ProductCard({ product, onQuickView }: ProductCardProps) 
   const [isAdding, setIsAdding] = useState(false);
 
   const inWishlist = isInWishlist(product._id || product.id || product.slug);
-  const primaryImage = product.images?.[0] || product.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000';
-  const secondaryImage = product.images?.[1] || primaryImage;
+  const rawPrimary = product.images?.[0] || product.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000';
+  const rawSecondary = product.images?.[1] || rawPrimary;
+  const primaryImage = formatImageUrl(rawPrimary);
+  const secondaryImage = formatImageUrl(rawSecondary);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();

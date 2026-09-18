@@ -11,6 +11,7 @@ import {
   Star 
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
+import { formatImageUrl } from '@/lib/mediaUtils';
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
@@ -619,7 +620,7 @@ export default function AdminProductsPage() {
                         .filter(Boolean)
                         .map((url, idx) => (
                           <div key={idx} className="relative w-14 h-14 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden shrink-0">
-                            <img src={url} alt={`Preview ${idx + 1}`} className="w-full h-full object-contain p-0.5" />
+                            <img src={formatImageUrl(url)} alt={`Preview ${idx + 1}`} className="w-full h-full object-contain p-0.5" />
                             <span className="absolute bottom-0 right-0 bg-slate-900/80 text-white text-[8px] font-bold px-1 rounded-tl">
                               #{idx + 1}
                             </span>
