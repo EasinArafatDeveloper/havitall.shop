@@ -274,6 +274,7 @@ export async function POST(request: Request) {
       category: category.trim(),
       description: description ? String(description).trim() : `${name.trim()} - Luxury lifestyle item.`,
       images: Array.isArray(images) && images.length > 0 ? images : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'],
+      videoUrl: body.videoUrl ? String(body.videoUrl).trim() : undefined,
       stock: Math.max(0, parseInt(String(body.stock || 10), 10)),
       price: numPrice,
       originalPrice,

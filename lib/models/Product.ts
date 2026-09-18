@@ -23,6 +23,7 @@ export interface IProduct extends Document {
     colors?: string[];
     sizes?: string[];
   };
+  videoUrl?: string;
   features?: string[];
   tags?: string[];
   source?: string;
@@ -54,6 +55,7 @@ const ProductSchema = new Schema<IProduct>(
       colors: { type: [String], default: [] },
       sizes: { type: [String], default: [] },
     },
+    videoUrl: { type: String },
     features: { type: [String], default: [] },
     tags: { type: [String], default: [] },
     source: { type: String, default: 'local' },

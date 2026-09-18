@@ -144,38 +144,94 @@ export default function ProductDetailPage() {
         {/* Main Product Showcase Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 mb-16">
           
-          {/* Left: Product Images Gallery */}
+          {/* Left: Product Images Gallery & Video Showcase */}
           <div className="lg:col-span-6 flex flex-col gap-4">
-            {/* Main High-res Image */}
+            {/* Main High-res Image or Video Player */}
             <div className="relative aspect-square w-full rounded-3xl overflow-hidden bg-white p-4 border border-slate-200 shadow-sm flex items-center justify-center">
-              <img
-                src={images[selectedImgIdx] || images[0]}
-                alt={product.name}
-                className="w-full h-full object-contain rounded-2xl"
-              />
-              {product.discountPercentage > 0 && (
-                <span className="absolute top-6 left-6 px-3 py-1.5 rounded-xl bg-rose-600 text-white font-black text-xs shadow-sm uppercase tracking-wider">
-                  -{product.discountPercentage}% OFF
-                </span>
+              {selectedImgIdx === -1 && product.videoUrl ? (
+                // Video Player Mode
+                <div className="w-full h-full rounded-2xl overflow-hidden bg-black flex items-center justify-center">
+                  {product.videoUrl.includes('youtube.com') || product.videoUrl.includes('youtu.be') ? (
+                    <iframe
+                      src={
+                        product.videoUrl.includes('youtu.be/')
+                          ? `https://www.youtube.com/embed/${product.videoUrl.split('youtu.be/')[1]?.split('?')[0]}`
+                          : product.videoUrl.includes('shorts/')
+                          ? `https://www.youtube.com/embed/${product.videoUrl.split('shorts/')[1]?.split('?')[0]}`
+                          : `https://www.youtube.com/embed/${new URLSearchParams(new URL(product.videoUrl).search).get('v')}`
+                      }
+                      title={product.name}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="w-full h-full rounded-2xl border-0"
+                    />
+                  ) : product.videoUrl.includes('drive.google.com') ? (
+                    <iframe
+                      src={product.videoUrl.replace(/\/view.*$/, '/preview').replace(/\/edit.*$/, '/preview')}
+                      title={product.name}
+                      allow="autoplay"
+                      allowFullScreen
+                      className="w-full h-full rounded-2xl border-0"
+                    />
+                  ) : (
+                    <video
+                      src={product.videoUrl}
+                      controls
+                      autoPlay
+                      className="w-full h-full object-contain rounded-2xl"
+                    />
+                  )}
+                </div>
+              ) : (
+                // Image Mode
+                <>
+                  <img
+                    src={images[selectedImgIdx >= 0 ? selectedImgIdx : 0] || images[0]}
+                    alt={product.name}
+                    className="w-full h-full object-contain rounded-2xl transition-all duration-300"
+                  />
+                  {product.discountPercentage > 0 && (
+                    <span className="absolute top-6 left-6 px-3 py-1.5 rounded-xl bg-rose-600 text-white font-black text-xs shadow-sm uppercase tracking-wider">
+                      -{product.discountPercentage}% OFF
+                    </span>
+                  )}
+                </>
               )}
             </div>
 
-            {/* Thumbnail Row */}
-            {images.length > 1 && (
+            {/* Thumbnail Row (Images + Video Preview) */}
+            {(images.length > 1 || product.videoUrl) && (
               <div className="flex items-center gap-3 overflow-x-auto pb-2">
                 {images.map((img: string, idx: number) => (
                   <button
                     key={idx}
                     onClick={() => setSelectedImgIdx(idx)}
-                    className={`w-20 h-20 rounded-2xl overflow-hidden border-2 shrink-0 transition-all bg-white p-1 ${
+                    className={`w-20 h-20 rounded-2xl overflow-hidden border-2 shrink-0 transition-all bg-white p-1 cursor-pointer ${
                       selectedImgIdx === idx
-                        ? 'border-slate-950 scale-105 shadow-md'
-                        : 'border-slate-200 opacity-60 hover:opacity-100'
+                        ? 'border-slate-950 scale-105 shadow-md ring-2 ring-slate-950/10'
+                        : 'border-slate-200 opacity-65 hover:opacity-100'
                     }`}
                   >
-                    <img src={img} alt="" className="w-full h-full object-contain" />
+                    <img src={img} alt="" className="w-full h-full object-contain rounded-xl" />
                   </button>
                 ))}
+
+                {/* Video Play Button Thumbnail */}
+                {product.videoUrl && (
+                  <button
+                    onClick={() => setSelectedImgIdx(-1)}
+                    className={`w-20 h-20 rounded-2xl overflow-hidden border-2 shrink-0 transition-all bg-slate-950 text-white flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                      selectedImgIdx === -1
+                        ? 'border-amber-400 scale-105 shadow-md ring-2 ring-amber-400/20'
+                        : 'border-slate-800 opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <div className="w-7 h-7 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-xs">
+                      ▶
+                    </div>
+                    <span className="text-[9px] font-bold text-amber-300">Video</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

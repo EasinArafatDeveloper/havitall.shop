@@ -30,7 +30,8 @@ export default function AdminProductsPage() {
     originalPrice: '',
     category: 'luxury-watches',
     stock: '15',
-    imageUrl: '',
+    imageUrls: '',
+    videoUrl: '',
     description: '',
     shortDescription: '',
     isHot: false,
@@ -155,7 +156,8 @@ export default function AdminProductsPage() {
       originalPrice: '',
       category: categories[0]?.slug || 'luxury-watches',
       stock: '15',
-      imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000',
+      imageUrls: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000',
+      videoUrl: '',
       description: '',
       shortDescription: '',
       isHot: false,
@@ -170,13 +172,15 @@ export default function AdminProductsPage() {
 
   const handleOpenEdit = (product: any) => {
     setEditingProduct(product);
+    const existingImgs = (Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image || '']).filter(Boolean);
     setFormData({
       name: product.name || '',
       price: String(product.price ?? ''),
       originalPrice: String(product.originalPrice ?? ''),
       category: product.category || 'luxury-watches',
       stock: String(product.stock ?? 10),
-      imageUrl: product.images?.[0] || product.image || '',
+      imageUrls: existingImgs.join('\n'),
+      videoUrl: product.videoUrl || '',
       description: product.description || '',
       shortDescription: product.shortDescription || '',
       isHot: Boolean(product.isHot),
@@ -224,6 +228,11 @@ export default function AdminProductsPage() {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
+    const parsedImages = formData.imageUrls
+      .split(/[\n,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
     const payload = {
       _id: editingProduct?._id,
       slug: editingProduct?.slug,
@@ -233,7 +242,8 @@ export default function AdminProductsPage() {
       originalPrice: formData.originalPrice ? Number(formData.originalPrice) : undefined,
       category: formData.category,
       stock: Number(formData.stock),
-      images: [formData.imageUrl.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'],
+      images: parsedImages.length > 0 ? parsedImages : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000'],
+      videoUrl: formData.videoUrl.trim() || undefined,
       description: formData.description.trim(),
       shortDescription: formData.shortDescription.trim(),
       isHot: formData.isHot,
@@ -583,15 +593,62 @@ export default function AdminProductsPage() {
                   />
                 </div>
 
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="font-semibold text-slate-700">Image URL</label>
+                {/* Multi-Image Gallery URLs */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-semibold text-slate-700">
+                      Product Gallery Images (একাধিক ছবির লিংক প্রতি লাইনে ১টি করে দিন)
+                    </label>
+                    <span className="text-[10px] text-slate-400">
+                      Supports direct image links / Google Drive image links
+                    </span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    placeholder={`https://images.unsplash.com/...&#10;https://drive.google.com/uc?export=view&id=FILE_ID&#10;https://...`}
+                    value={formData.imageUrls}
+                    onChange={(e) => setFormData({ ...formData, imageUrls: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white text-xs font-mono"
+                  />
+                  {/* Live Thumbnails Preview */}
+                  {formData.imageUrls.trim() && (
+                    <div className="flex items-center gap-2 overflow-x-auto pt-1">
+                      {formData.imageUrls
+                        .split(/[\n,]+/)
+                        .map((s) => s.trim())
+                        .filter(Boolean)
+                        .map((url, idx) => (
+                          <div key={idx} className="relative w-14 h-14 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden shrink-0">
+                            <img src={url} alt={`Preview ${idx + 1}`} className="w-full h-full object-contain p-0.5" />
+                            <span className="absolute bottom-0 right-0 bg-slate-900/80 text-white text-[8px] font-bold px-1 rounded-tl">
+                              #{idx + 1}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Product Video Showcase URL */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-semibold text-slate-700">
+                      Product Video URL (ভিডিও লিংক — YouTube, Shorts, Google Drive Video বা MP4)
+                    </label>
+                    <span className="text-[10px] text-amber-600 font-semibold">
+                      🎬 Customer can watch directly on website
+                    </span>
+                  </div>
                   <input
                     type="text"
-                    placeholder="https://images.unsplash.com/..."
-                    value={formData.imageUrl}
-                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                    placeholder="https://www.youtube.com/watch?v=... or https://drive.google.com/file/d/.../preview"
+                    value={formData.videoUrl}
+                    onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-slate-950 focus:bg-white"
                   />
+                  <p className="text-[10px] text-slate-400">
+                    টিপ: ইউটিউব ভিডিও লিংক, গুগল ড্রাইভ ভিডিও লিংক বা সরাসরি MP4 দিলে প্রোডাক্ট পেজে ভিডিও প্লেয়ার চালু হবে।
+                  </p>
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">

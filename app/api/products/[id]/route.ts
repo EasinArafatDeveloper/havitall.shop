@@ -187,6 +187,7 @@ export async function PUT(
       if (body.isHot !== undefined) existingProduct.isHot = Boolean(body.isHot);
       if (body.isFeatured !== undefined) existingProduct.isFeatured = Boolean(body.isFeatured);
       if (body.badge !== undefined) existingProduct.badge = body.badge;
+      if (body.videoUrl !== undefined) existingProduct.videoUrl = String(body.videoUrl).trim();
       if (body.variants) existingProduct.variants = body.variants;
       if (body.features) existingProduct.features = body.features;
       if (body.tags) existingProduct.tags = body.tags;
@@ -225,6 +226,7 @@ export async function PUT(
         images: Array.isArray(body.images) && body.images.length > 0
           ? body.images
           : (bkOriginal?.images || ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000']),
+        videoUrl: body.videoUrl !== undefined ? String(body.videoUrl).trim() : ((bkOriginal as any)?.videoUrl || ''),
         stock: body.stock !== undefined ? Number(body.stock) : (bkOriginal?.stock ?? 10),
         rating: bkOriginal?.rating || 4.8,
         numReviews: bkOriginal?.numReviews || 12,
