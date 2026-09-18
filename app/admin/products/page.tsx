@@ -25,7 +25,7 @@ export default function AdminProductsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'featured' | 'hot'>('all');
-  const [mediaLibrary, setMediaLibrary] = useState<{ url: string; name: string }[]>([]);
+  const [scannedDrivePhotos, setScannedDrivePhotos] = useState<string[]>([]);
   const [driveScanUrl, setDriveScanUrl] = useState('');
   const [isScanningDrive, setIsScanningDrive] = useState(false);
   const { success, error, info } = useToast();
@@ -48,18 +48,6 @@ export default function AdminProductsPage() {
     features: '',
   });
 
-  const loadMediaLibrary = async () => {
-    try {
-      const res = await fetch('/api/admin/media-library');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.images)) {
-        setMediaLibrary(data.images);
-      }
-    } catch (e) {
-      console.error('Error loading media library:', e);
-    }
-  };
-
   const handleScanDrive = async () => {
     if (!driveScanUrl.trim()) {
       error('Please enter a Google Drive link (Folder or File)');
@@ -74,32 +62,10 @@ export default function AdminProductsPage() {
       });
       const data = await res.json();
       if (data.success && data.images?.length > 0) {
-        success(`Successfully added ${data.images.length} photo(s) from Google Drive!`);
-        const newItems = data.images.map((url: string, i: number) => ({
-          url,
-          name: `Drive Photo ${i + 1}`,
-        }));
-        
-        // Add to media library
-        setMediaLibrary((prev) => {
-          const existing = new Set(prev.map((p) => p.url));
-          const unique = newItems.filter((item: any) => !existing.has(item.url));
-          return [...prev, ...unique];
-        });
-
-        // Automatically select the newly scanned images into formData.imageUrls
-        setFormData((prev) => {
-          const currentList = prev.imageUrls
-            .split(/[\n,]+/)
-            .map((s) => s.trim())
-            .filter(Boolean);
-          const toAdd = data.images.filter((u: string) => !currentList.includes(u));
-          return {
-            ...prev,
-            imageUrls: [...currentList, ...toAdd].join('\n'),
-          };
-        });
-
+        success(`${data.images.length} Drive photo(s) found! Click on the photos below to select only the ones you want.`);
+        // Set scanned photos for this product session
+        setScannedDrivePhotos(data.images);
+        // Note: Photos remain unselected by default so user can choose specifically
         setDriveScanUrl('');
       } else {
         error(data.error || 'No images found in this Google Drive link');
@@ -152,7 +118,6 @@ export default function AdminProductsPage() {
 
   useEffect(() => {
     loadData();
-    loadMediaLibrary();
   }, []);
 
   const handleToggleFeatured = async (product: any) => {
@@ -239,28 +204,32 @@ export default function AdminProductsPage() {
 
   const handleOpenAdd = () => {
     setEditingProduct(null);
+    setScannedDrivePhotos([]);
+    setDriveScanUrl('');
     setFormData({
       name: '',
       price: '',
       originalPrice: '',
       category: categories[0]?.slug || 'luxury-watches',
       stock: '15',
-      imageUrls: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000',
+      imageUrls: '',
       videoUrl: '',
       description: '',
       shortDescription: '',
       isHot: false,
       isFeatured: false,
       badge: 'New',
-      colors: 'Black, Silver, Gold',
-      sizes: 'Standard',
-      features: 'Premium Build Quality, 1-Year Official Warranty, Express Shipping Included',
+      colors: '',
+      sizes: '',
+      features: '',
     });
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (product: any) => {
     setEditingProduct(product);
+    setScannedDrivePhotos([]);
+    setDriveScanUrl('');
     const existingImgs = (Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image || '']).filter(Boolean);
     setFormData({
       name: product.name || '',
@@ -735,79 +704,96 @@ export default function AdminProductsPage() {
                     </div>
 
                     {/* Visual Clickable Photoshoot Grid */}
-                    {mediaLibrary.length > 0 && (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
-                          <span>Available Photos ({mediaLibrary.length} Photos):</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const all = mediaLibrary.map(m => m.url).join('\n');
-                                setFormData(prev => ({ ...prev, imageUrls: all }));
-                              }}
-                              className="text-indigo-600 hover:underline cursor-pointer"
-                            >
-                              Select All
-                            </button>
-                            <span>•</span>
-                            <button
-                              type="button"
-                              onClick={() => setFormData(prev => ({ ...prev, imageUrls: '' }))}
-                              className="text-rose-600 hover:underline cursor-pointer"
-                            >
-                              Clear All
-                            </button>
+                    {(() => {
+                      const currentSelected = formData.imageUrls
+                        .split(/[\n,]+/)
+                        .map((s) => s.trim())
+                        .filter(Boolean);
+                      const availableProductPhotos = Array.from(
+                        new Set([...currentSelected, ...scannedDrivePhotos])
+                      );
+
+                      if (availableProductPhotos.length === 0) {
+                        return (
+                          <div className="text-center py-6 px-4 bg-white rounded-2xl border border-dashed border-slate-200 text-slate-500">
+                            <ImageIcon className="w-8 h-8 mx-auto text-slate-300 mb-1.5" />
+                            <p className="text-xs font-semibold text-slate-700">এই প্রোডাক্টের জন্য কোনো ড্রাইভ ফটো স্ক্যান করা হয়নি</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              উপরে আপনার Google Drive লিঙ্ক দিয়ে <strong>Scan Drive</strong> বাটনে ক্লিক করলে ছবিগুলো এখানে শো করবে।
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
+                            <span>Available Photos ({availableProductPhotos.length} Photos):</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const all = availableProductPhotos.join('\n');
+                                  setFormData((prev) => ({ ...prev, imageUrls: all }));
+                                }}
+                                className="text-indigo-600 hover:underline cursor-pointer font-bold"
+                              >
+                                Select All
+                              </button>
+                              <span>•</span>
+                              <button
+                                type="button"
+                                onClick={() => setFormData((prev) => ({ ...prev, imageUrls: '' }))}
+                                className="text-rose-600 hover:underline cursor-pointer font-bold"
+                              >
+                                Clear All
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-56 overflow-y-auto p-2 bg-white rounded-2xl border border-slate-200 shadow-inner">
+                            {availableProductPhotos.map((photoUrl, idx) => {
+                              const selectIndex = currentSelected.indexOf(photoUrl);
+                              const isSelected = selectIndex !== -1;
+
+                              return (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => toggleImageSelection(photoUrl)}
+                                  className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all p-1 group cursor-pointer ${
+                                    isSelected
+                                      ? 'border-emerald-600 ring-2 ring-emerald-500/20 shadow-md bg-emerald-50 scale-95'
+                                      : 'border-slate-200 opacity-60 hover:opacity-100 hover:border-slate-400 bg-slate-50'
+                                  }`}
+                                >
+                                  <img
+                                    src={formatImageUrl(photoUrl)}
+                                    alt=""
+                                    referrerPolicy="no-referrer"
+                                    className="w-full h-full object-contain rounded-lg"
+                                  />
+                                  {isSelected ? (
+                                    <span className="absolute top-1 right-1 bg-emerald-600 text-white rounded-full w-4 h-4 text-[9px] font-black flex items-center justify-center shadow-xs">
+                                      ✓
+                                    </span>
+                                  ) : (
+                                    <span className="absolute top-1 right-1 bg-slate-900/40 text-white rounded-full w-4 h-4 text-[9px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                      +
+                                    </span>
+                                  )}
+                                  {isSelected && (
+                                    <span className="absolute bottom-0 inset-x-0 bg-emerald-800/90 text-white text-[8px] font-bold text-center py-0.5 truncate px-0.5">
+                                      {selectIndex === 0 ? '★ Cover' : `#${selectIndex + 1}`}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
-
-                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-52 overflow-y-auto p-2 bg-white rounded-2xl border border-slate-200 shadow-inner">
-                          {mediaLibrary.map((item, idx) => {
-                            const currentSelected = formData.imageUrls
-                              .split(/[\n,]+/)
-                              .map((s) => s.trim())
-                              .filter(Boolean);
-                            const selectIndex = currentSelected.indexOf(item.url);
-                            const isSelected = selectIndex !== -1;
-
-                            return (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => toggleImageSelection(item.url)}
-                                title={item.name}
-                                className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all p-1 group cursor-pointer ${
-                                  isSelected
-                                    ? 'border-emerald-600 ring-2 ring-emerald-500/20 shadow-md bg-emerald-50 scale-95'
-                                    : 'border-slate-200 opacity-70 hover:opacity-100 hover:border-slate-400 bg-slate-50'
-                                }`}
-                              >
-                                <img
-                                  src={formatImageUrl(item.url)}
-                                  alt={item.name}
-                                  referrerPolicy="no-referrer"
-                                  className="w-full h-full object-contain rounded-lg"
-                                />
-                                {isSelected ? (
-                                  <span className="absolute top-1 right-1 bg-emerald-600 text-white rounded-full w-4 h-4 text-[9px] font-black flex items-center justify-center shadow-xs">
-                                    ✓
-                                  </span>
-                                ) : (
-                                  <span className="absolute top-1 right-1 bg-slate-900/40 text-white rounded-full w-4 h-4 text-[9px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                    +
-                                  </span>
-                                )}
-                                {isSelected && (
-                                  <span className="absolute bottom-0 inset-x-0 bg-emerald-800/90 text-white text-[8px] font-bold text-center py-0.5">
-                                    {selectIndex === 0 ? '★ Cover' : `#${selectIndex + 1}`}
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Selected Gallery Order List & Manual Link Input */}
                     <div className="space-y-1.5 pt-1">
