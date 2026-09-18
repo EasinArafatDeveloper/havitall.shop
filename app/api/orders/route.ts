@@ -19,9 +19,15 @@ export async function GET(request: Request) {
   }
 
   try {
+    const { searchParams } = new URL(request.url);
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? Math.min(100, Math.max(1, parseInt(limitParam, 10))) : 0;
+
     const db = await connectToDatabase();
     if (db) {
-      const orders = await Order.find().sort({ createdAt: -1 }).lean();
+      const query = Order.find().sort({ createdAt: -1 });
+      if (limit > 0) query.limit(limit);
+      const orders = await query.lean();
       return NextResponse.json({ success: true, orders: orders || [], source: 'mongodb' });
     }
 

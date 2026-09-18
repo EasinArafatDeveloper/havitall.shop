@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 
+import AdminOrderNotifier from '@/components/admin/AdminOrderNotifier';
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -133,12 +135,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <span className="font-bold text-white font-display">HavItAll Admin</span>
         </Link>
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="p-2 text-slate-400 hover:text-white rounded-lg bg-slate-900 border border-slate-800"
-        >
-          {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <AdminOrderNotifier />
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 text-slate-400 hover:text-white rounded-lg bg-slate-900 border border-slate-800"
+          >
+            {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Sidebar */}
@@ -193,7 +198,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <button
             onClick={handleResetData}
             disabled={isSeeding}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-semibold transition-colors"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-semibold transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isSeeding ? 'animate-spin' : ''}`} />
             <span>Clean Demo Data</span>
@@ -202,7 +207,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {/* Logout Button */}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 text-xs font-bold transition-colors"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 text-xs font-bold transition-colors cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Secure Logout</span>
@@ -211,8 +216,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-w-0 p-4 sm:p-6 lg:p-10 max-w-7xl bg-slate-50 text-slate-900">
-        {children}
+      <div className="flex-1 min-w-0 flex flex-col bg-slate-50 text-slate-900">
+        {/* Desktop Admin Header Topbar with Live Notifier */}
+        <header className="hidden md:flex items-center justify-between px-6 lg:px-10 py-4 bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <span>Admin</span>
+            <span>/</span>
+            <span className="text-slate-950 font-bold capitalize">
+              {pathname === '/admin' ? 'Dashboard Overview' : pathname.replace('/admin/', '').replace('-', ' ')}
+            </span>
+          </div>
+
+          {/* Real-time Order Notifier and Controls */}
+          <AdminOrderNotifier />
+        </header>
+
+        {/* Content Body */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-10 max-w-7xl">
+          {children}
+        </main>
       </div>
     </div>
   );
