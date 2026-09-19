@@ -3,7 +3,7 @@
 import Script from 'next/script';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
-import { FB_PIXEL_ID, pageview } from '@/lib/fbpixel';
+import { FB_PIXEL_IDS, pageview } from '@/lib/fbpixel';
 
 export default function MetaPixel() {
   const pathname = usePathname();
@@ -28,19 +28,22 @@ export default function MetaPixel() {
             t.src=v;s=b.getElementsByTagName(e)[0];
             s.parentNode.insertBefore(t,s)}(window, document,'script',
             'https://connect.facebook.net/en_US/fbevents.js');
-            fbq('init', '${FB_PIXEL_ID}');
+            ${FB_PIXEL_IDS.map((id) => `fbq('init', '${id}');`).join('\n            ')}
           `,
         }}
       />
       <noscript>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          height={1}
-          width={1}
-          style={{ display: 'none' }}
-          src={`https://www.facebook.com/tr?id=${FB_PIXEL_ID}&ev=PageView&noscript=1`}
-          alt=""
-        />
+        {FB_PIXEL_IDS.map((id) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={id}
+            height={1}
+            width={1}
+            style={{ display: 'none' }}
+            src={`https://www.facebook.com/tr?id=${id}&ev=PageView&noscript=1`}
+            alt=""
+          />
+        ))}
       </noscript>
     </>
   );

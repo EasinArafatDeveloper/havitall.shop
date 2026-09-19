@@ -6,6 +6,11 @@ declare global {
 
 export const FB_PIXEL_ID = process.env.NEXT_PUBLIC_FB_PIXEL_ID || '1089367523503019';
 
+// Every init'd pixel receives all fbq('track', ...) events automatically.
+export const FB_PIXEL_IDS = [FB_PIXEL_ID, '2709139612834841'].filter(
+  (id, i, all) => all.indexOf(id) === i
+);
+
 export const pageview = () => {
   if (typeof window !== 'undefined' && window.fbq) {
     window.fbq('track', 'PageView');
